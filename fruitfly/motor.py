@@ -51,6 +51,18 @@ class MotorMap:
     GF_TAU = 0.30         # s, GF rate estimator time constant
     ESCAPE_REFRACT = 0.7  # s after an escape before the next one
     JINK_COOLDOWN = 1.2   # s between spontaneous startle jinks
+    # Fly/land balance, tuned against a captured 120 s descending trace
+    # (pool percentiles p10/50/90 = 3.9/5.1/7.0 Hz). Real flies spend most
+    # of their time sitting; these give ~70% ground time undisturbed and
+    # ~4 s sits, dropping as your cursor gets closer.
+    LAND_REF = 6.3        # Hz; calm below this accumulates landing drive
+    LAND_THRESH = (0.6, 2.0)     # landing-drive threshold range
+    TAKEOFF_REF = 8.8     # Hz; bursts above this accumulate takeoff drive
+    TAKEOFF_THRESH = (2.5, 6.0)  # takeoff-drive threshold range
+    # A hunted fly is reluctant to land, not incapable — threat scales the
+    # calm accumulation down instead of zeroing it. (Zeroing meant a fly
+    # with your cursor anywhere near it could never land at all.)
+    THREAT_LAND_GATE = 1.0
 
     def __init__(self, width: int, height: int):
         self.w, self.h = width, height
@@ -202,11 +214,14 @@ class MotorMap:
             # descending pool is below its ~median (5.2 Hz), drains when
             # aroused or threatened, lands when it wins. Gives naturally
             # variable flight bouts without needing unbroken quiet.
-            if threat > 0.05:
-                self._land_drive = 0.0
-            else:
-                self._land_drive = max(0.0, self._land_drive
-                                       + max(-1.0, min(1.0, 5.8 - desc)) * dt)
+            calm = max(-1.0, min(1.0, self.LAND_REF - desc))
+            if calm > 0.0:
+                gate = self.THREAT_LAND_GATE
+                if gate <= 0.0:               # legacy hard gate
+                    calm = 0.0 if threat > 0.05 else calm
+                else:
+                    calm *= max(0.0, 1.0 - threat / gate)
+            self._land_drive = max(0.0, self._land_drive + calm * dt)
             if self._land_drive > self._land_thresh:
                 st.state = LANDED
                 st.speed = 0.0
@@ -215,7 +230,7 @@ class MotorMap:
         else:  # LANDED: sitting, until the brain stirs
             st.speed = 0.0
             # descending bursts above the ~90th pct accumulate takeoff drive
-            self._takeoff_drive += max(0.0, desc - 7.5 + fwd) * dt
+            self._takeoff_drive += max(0.0, desc - self.TAKEOFF_REF + fwd) * dt
             self._takeoff_drive *= (1.0 - 0.1 * dt)
             if threat > 0.5:
                 self._escape_dir = threat_bearing + math.pi \
@@ -224,13 +239,13 @@ class MotorMap:
                               escape=True)
                 self._takeoff_drive = 0.0
                 self._land_drive = 0.0
-                self._land_thresh = self.rng.uniform(1.0, 3.0)
-            elif self._takeoff_drive > self.rng.uniform(0.5, 2.0):
+                self._land_thresh = self.rng.uniform(*self.LAND_THRESH)
+            elif self._takeoff_drive > self.rng.uniform(*self.TAKEOFF_THRESH):
                 self._startle(t, "descending activity -> takeoff",
                               escape=False)
                 self._takeoff_drive = 0.0
                 self._land_drive = 0.0
-                self._land_thresh = self.rng.uniform(1.0, 3.0)
+                self._land_thresh = self.rng.uniform(*self.LAND_THRESH)
 
         # --- integrate position ------------------------------------------
         if st.speed > 0.0:

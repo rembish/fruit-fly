@@ -1,4 +1,4 @@
-# fruit-fly-linux 🪰
+# fruit-fly 🪰
 
 A fly that lives on your Linux desktop, driven by the **complete real brain
 of a fruit fly** — the [FlyWire](https://flywire.ai/) connectome of adult
@@ -92,6 +92,8 @@ mortal**:
   its real mechanosensory JO (Johnston's organ) neurons, the same pathway
   that drives the giant fiber in a living fly, and it tumbles away
   (*swats dodged +1*)
+- like a real fly it spends **most of its time sitting** (~70% when
+  undisturbed, less as you close in), so there is always a target
 - catch it **on the ground** and it's a SPLAT (*flies swatted +1*). Your
   approaching cursor looms on its retina and fires its escape circuit at
   ~110 px — but like a real fly, it then needs **100–220 ms to actually
