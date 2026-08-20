@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import math
 
+import cairo
+
 BODY = (0.16, 0.12, 0.08)       # dark brown
 THORAX = (0.24, 0.18, 0.10)
 EYE = (0.45, 0.08, 0.05)        # dark red
@@ -18,13 +20,28 @@ def draw_fly(cr, x: float, y: float, heading: float, size: float,
     cr.rotate(heading)
     s = size / 34.0
 
-    # faint drop shadow when landed (sitting on the "glass")
+    # faint drop shadow when landed (sitting on the "glass").
+    # The offset is undone and redone around the rotation on purpose: the
+    # shadow keeps the body's shape, which turns with the fly, but falls
+    # in a fixed direction on screen, which does not. Offsetting inside
+    # the rotation made the shadow orbit the fly as it turned.
     if not flying:
-        cr.set_source_rgba(0, 0, 0, 0.18)
         cr.save()
-        cr.translate(2 * s, 3 * s)
-        cr.scale(1.1, 0.9)
-        _ellipse(cr, 0, 0, 12 * s, 7 * s)
+        cr.rotate(-heading)
+        cr.translate(2.5 * s, 3.5 * s)
+        cr.rotate(heading)
+        # soft-edged: a flat ellipse reads as a grey blob stuck to the
+        # fly, not as a shadow. Cairo has no blur, so fall the alpha off
+        # with a radial gradient over a unit circle scaled to the body.
+        cr.translate(-4 * s, 0)
+        cr.scale(11.5 * s, 5.0 * s)
+        haze = cairo.RadialGradient(0, 0, 0, 0, 0, 1)
+        haze.add_color_stop_rgba(0.00, 0, 0, 0, 0.20)
+        haze.add_color_stop_rgba(0.45, 0, 0, 0, 0.13)
+        haze.add_color_stop_rgba(0.75, 0, 0, 0, 0.05)
+        haze.add_color_stop_rgba(1.00, 0, 0, 0, 0.00)
+        cr.set_source(haze)
+        cr.arc(0, 0, 1, 0, 2 * math.pi)
         cr.fill()
         cr.restore()
 

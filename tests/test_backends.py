@@ -9,6 +9,7 @@ Run:  python3 tests/test_backends.py
 """
 
 import ctypes
+import math
 import os
 import pathlib
 import re
@@ -222,6 +223,38 @@ def test_landed_fly_shows_its_wings():
     print(f"landed fly shows {wing} wing pixels over the abdomen")
 
 
+def test_shadow_does_not_turn_with_the_fly():
+    """The landed fly's drop shadow must stay put as the fly turns.
+
+    It used to be offset inside the heading rotation, so it orbited the
+    fly -- down-right, then down-left, then up-left -- as though the light
+    turned with the insect. That also makes the sprite rotationally
+    symmetric: heading=pi renders exactly as heading=0 turned 180
+    degrees. A screen-fixed shadow breaks that symmetry, which is what
+    this measures: 84 differing pixels when it rotated (antialiasing
+    only), 764 once it stopped.
+    """
+    def render(heading):
+        w = h = 200
+        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, w, h)
+        cr = cairo.Context(surface)
+        cr.set_source_rgb(1, 1, 1)
+        cr.paint()
+        draw_fly(cr, w / 2, h / 2, heading, 80.0, flying=False,
+                 wing_phase=0.0)
+        surface.flush()
+        px = np.frombuffer(surface.get_data(), dtype=np.uint8)
+        px = px.reshape(h, surface.get_stride() // 4, 4)
+        return px[:, :w, :3].astype(int)
+
+    upright, flipped = render(0.0), render(math.pi)
+    delta = np.abs(flipped - upright[::-1, ::-1]).sum(axis=2)
+    differing = int((delta > 8).sum())
+    assert differing > 300, (
+        f"only {differing} pixels differ: the shadow is turning with the fly")
+    print(f"shadow stays put as the fly turns ({differing} px asymmetry)")
+
+
 def test_swat_semantics():
     _host, ctl = build()
     ctl.motor.st.state = LANDED
@@ -277,6 +310,7 @@ if __name__ == "__main__":
     test_drawing_surfaces()
     test_layered_window_pixel_contract()
     test_landed_fly_shows_its_wings()
+    test_shadow_does_not_turn_with_the_fly()
     test_swat_semantics()
     test_win32_signatures_declared()
     test_hit_radius()
