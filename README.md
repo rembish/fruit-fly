@@ -17,9 +17,11 @@ neuron decided to.
 ## How it works
 
 ```
-your screen ──► photoreceptors (11,151 neurons)  ─┐
-your cursor ──► looming detectors LC4/LPLC2 (314) ─┤
-                                                   ▼
+your screen ──► RETINOTOPIC EYES: 785+796 real eye columns, 9,199 mapped
+                photoreceptors + 4,541 lamina cells, each driven by the
+                actual pixels its column sees (cursor rendered with
+                perspective: it looms as it approaches)               ─┐
+                                                                       ▼
                      WHOLE-BRAIN LIF SIMULATION (139,255 neurons,
                      2.7M connections, ~34M synapses, real time)
                                                    │
@@ -29,6 +31,16 @@ your cursor ──► looming detectors LC4/LPLC2 (314) ─┤
                                                    ▼
                      transparent click-through GTK overlay on your desktop
 ```
+
+The eyes are real: each eye's hexagonal lattice of columns comes from the
+FlyWire column assignments (Matsliah et al. 2024), R1-6 photoreceptors are
+assigned to columns through their actual lamina partners, and an expanding
+dark disc on the retina drives the loom detectors and giant fiber through
+nothing but anatomy (`tests/test_retina.py` proves it: LC4 ramps with
+expansion, lateralized to the stimulated eye, weak response to full-field
+dimming). The emergent loom signal is weaker than a real fly's, so by
+default a scaled-down direct LC4/LPLC2 injection backs it up for reliable
+cursor dodging — run with `--pure-retina` to trust the eyes alone.
 
 The model follows [Shiu et al. 2024, *Nature*](https://pubmed.ncbi.nlm.nih.gov/37205514/)
 (the first whole-brain fly simulation): connection weight = synapse count,
@@ -62,9 +74,10 @@ fruitfly
 Options:
 
 ```
-fruitfly --hud          live neural telemetry overlay (GF/DNa02/descending rates)
+fruitfly --hud          live neural telemetry overlay (GF/DNa02/LC4 rates)
 fruitfly --size 48      bigger fly
-fruitfly --no-vision    don't sample screen luminance into the photoreceptors
+fruitfly --pure-retina  no looming injection: escapes only via the real eyes
+fruitfly --no-vision    don't sample the screen into the retina
 fruitfly --noise 140    more spontaneous brain activity (a more annoying fly)
 fruitfly --dt 1.0       finer integration (slower; default 2.0 ms)
 fruitfly test           headless 30 s behavioral test, no window
@@ -89,12 +102,25 @@ System → Preferences → Windows → enable compositing).
 
 What is real: the complete wiring diagram (every neuron, every connection
 ≥5 synapses, signed by predicted neurotransmitter), the LIF dynamics and
-parameters of Shiu et al., and the identity of every input/output circuit
-used (photoreceptors, LC4/LPLC2 looming detectors, giant fiber, DNa02
-steering neurons, DNp09, MDN, the descending pool).
+parameters of Shiu et al., the retinotopic eye maps, and the identity of
+every input/output circuit used (photoreceptors, lamina, LC4/LPLC2 looming
+detectors, giant fiber, DNa02 steering neurons, DNp09, MDN, the descending
+pool).
 
 What is added or approximated, and why:
 
+- **Histamine sign correction**: photoreceptors release histamine
+  (inhibitory), but the FlyWire NT classifier has no histamine class and
+  mislabels ~74% of their outputs as excitatory. Their outgoing sign is
+  forced negative during compilation — without this the ON/OFF pathways
+  are scrambled.
+- **Graded-neuron transduction**: photoreceptors and lamina monopolar
+  cells are non-spiking, graded neurons in the real fly, which a spiking
+  LIF model represents poorly (inhibition released onto a silent neuron
+  produces nothing). Their textbook transfer functions — adaptive
+  phototransduction, and the lamina's transient OFF response to local
+  darkening — are computed in the sensory layer and injected at L1/L2/L3
+  per column. Everything from the medulla onward is the real network.
 - **Background noise** (Poisson, central brain only): the connectome alone
   is silent — a network with no input never fires. Real brains have
   intrinsic noise and neuromodulation; ours is the source of all
@@ -118,13 +144,13 @@ What is added or approximated, and why:
 ## Layout
 
 ```
-fruitfly/data.py     download + compile the connectome into data/brain.npz
+fruitfly/data.py     download + compile connectome & retinotopy (brain.npz)
 fruitfly/brain.py    event-driven whole-brain LIF engine (numpy)
-fruitfly/senses.py   cursor -> looming neurons, screen -> photoreceptors
+fruitfly/senses.py   retinotopic eyes: pixels -> photoreceptors & lamina
 fruitfly/motor.py    descending neurons -> flight kinematics
 fruitfly/sprite.py   the fly, in cairo
 fruitfly/app.py      transparent click-through GTK overlay + brain thread
-tests/               circuit tests and a headless closed-loop behavior test
+tests/               circuit, retina-emergence and closed-loop tests
 ```
 
 Data credit: [FlyWire](https://flywire.ai/) (Dorkenwald et al., Schlegel et

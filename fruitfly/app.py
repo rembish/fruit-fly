@@ -22,11 +22,12 @@ import cairo  # noqa: E402
 import numpy as np  # noqa: E402
 
 from .brain import Brain, RateMonitor
-from .senses import Senses, SensoryFrame
+from .senses import Senses, SensoryFrame, Retina, PATCH, EYE_RADIUS
 from .motor import MotorMap, FLYING, ESCAPE
 from .sprite import draw_fly
 
-MOTOR_POPS = ["GF", "DNa02_L", "DNa02_R", "DNp09", "MDN", "descending"]
+MOTOR_POPS = ["GF", "DNa02_L", "DNa02_R", "DNp09", "MDN", "descending",
+              "LC4_L", "LC4_R"]
 
 
 class Shared:
@@ -34,7 +35,7 @@ class Shared:
 
     def __init__(self):
         self.lock = threading.Lock()
-        self.stim: dict[str, float] = {}
+        self.stim: list = []
         self.rates: dict[str, float] = {}
         self.gf_count = 0
         self.sim_speed = 0.0
@@ -61,9 +62,7 @@ class BrainThread(threading.Thread):
         while not self.shared.stop:
             t0 = time.perf_counter()
             with self.shared.lock:
-                stim = dict(self.shared.stim)
-            stim.pop("_threat", None)
-            stim.pop("_bearing", None)
+                stim = list(self.shared.stim)
             b.set_stimulus(stim)
 
             gf_fired = 0
@@ -93,8 +92,8 @@ class BrainThread(threading.Thread):
 
 
 class FlyWindow(Gtk.Window):
-    def __init__(self, brain: Brain, size: float = 34.0, hud: bool = False,
-                 vision: bool = True, verbose: bool = True):
+    def __init__(self, brain: Brain, senses: Senses, size: float = 34.0,
+                 hud: bool = False, vision: bool = True, verbose: bool = True):
         super().__init__(type=Gtk.WindowType.POPUP)
         self.hud = hud
         self.vision = vision
@@ -120,7 +119,7 @@ class FlyWindow(Gtk.Window):
         self.connect("realize", self.on_realize)
 
         self.shared = Shared()
-        self.senses = Senses()
+        self.senses = senses
         self.motor = MotorMap(self.scr_w, self.scr_h)
         self.brain_thread = BrainThread(brain, self.shared)
         self.frame = SensoryFrame()
@@ -128,6 +127,7 @@ class FlyWindow(Gtk.Window):
         self._bearing = 0.0
         self._last_tick = time.perf_counter()
         self._lum_tick = 0
+        self._last_patch_t = time.perf_counter()
         self._t0 = time.perf_counter()
 
         self.brain_thread.start()
@@ -148,20 +148,29 @@ class FlyWindow(Gtk.Window):
         _, px, py = seat.get_pointer().get_position()
         self.frame.cursor_x, self.frame.cursor_y = float(px), float(py)
 
-        # luminance left/right of the fly, sampled sparsely (it's an X trip)
+        # eye patches: what each retina actually sees (~20 Hz; an X trip)
         self._lum_tick += 1
-        if self.vision and self._lum_tick % 6 == 0:
+        if self.vision and self._lum_tick % 3 == 0:
             root = Gdk.get_default_root_window()
-            for attr, side in (("lum_left", -1), ("lum_right", +1)):
-                ang = st.heading + side * math.pi / 2
-                sx = int(st.x + math.cos(ang) * 60) - 16
-                sy = int(st.y + math.sin(ang) * 60) - 16
-                sx = max(0, min(self.scr_w - 32, sx))
-                sy = max(0, min(self.scr_h - 32, sy))
-                pb = Gdk.pixbuf_get_from_window(root, sx, sy, 32, 32)
-                if pb is not None:
-                    data = np.frombuffer(pb.get_pixels(), dtype=np.uint8)
-                    setattr(self.frame, attr, float(data.mean()) / 255.0)
+            side_px = int(2 * EYE_RADIUS)
+            for attr, eye in (("patch_L", "L"), ("patch_R", "R")):
+                cx, cy = Senses.eye_center(st.x, st.y, st.heading, eye)
+                sx = max(0, min(self.scr_w - side_px, int(cx - EYE_RADIUS)))
+                sy = max(0, min(self.scr_h - side_px, int(cy - EYE_RADIUS)))
+                pb = Gdk.pixbuf_get_from_window(root, sx, sy, side_px, side_px)
+                if pb is None:
+                    continue
+                pb = pb.scale_simple(PATCH, PATCH, 2)  # BILINEAR
+                ch, rs = pb.get_n_channels(), pb.get_rowstride()
+                buf = np.frombuffer(pb.get_pixels(), dtype=np.uint8)
+                buf = np.pad(buf, (0, rs * PATCH - len(buf)))  # last-row pad
+                arr = buf.reshape(PATCH, rs)[:, : PATCH * ch]
+                arr = arr.reshape(PATCH, PATCH, ch)[..., :3]
+                setattr(self.frame, attr,
+                        arr.mean(axis=2).astype(np.float32) / 255.0)
+            now = time.perf_counter()
+            self.frame.patch_dt = min(0.5, now - self._last_patch_t)
+            self._last_patch_t = now
 
     # -------------------------------------------------------------- tick
     def tick(self):
@@ -172,9 +181,8 @@ class FlyWindow(Gtk.Window):
 
         self.sample_senses()
         st = self.motor.st
-        stim = self.senses.rates(self.frame, st.x, st.y, st.heading, t)
-        self._threat = stim["_threat"]
-        self._bearing = stim["_bearing"]
+        stim, self._threat, self._bearing = self.senses.rates(
+            self.frame, st.x, st.y, st.heading, t)
 
         with self.shared.lock:
             self.shared.stim = stim
@@ -219,6 +227,8 @@ class FlyWindow(Gtk.Window):
             f"threat {self._threat:4.2f}   state {self.motor.st.state}",
             "  ".join(f"{k} {rates.get(k, 0):5.1f}Hz"
                       for k in ("GF", "DNa02_L", "DNa02_R", "descending")),
+            "  ".join(f"{k} {rates.get(k, 0):5.1f}Hz"
+                      for k in ("LC4_L", "LC4_R")) + "   (loom detectors)",
             f"last: {self.motor.st.last_event}",
         ]
         cr.select_font_face("monospace", cairo.FONT_SLANT_NORMAL,
@@ -240,18 +250,24 @@ class FlyWindow(Gtk.Window):
 
 def run(noise_rate: float = 100.0, noise_weight: float = 3.0,
         inh_gain: float = 1.5, dt: float = 2.0, size: float = 34.0,
-        hud: bool = False, vision: bool = True, seed: int | None = None):
+        hud: bool = False, vision: bool = True, pure_retina: bool = False,
+        seed: int | None = None):
     from . import data
 
     print("[app] loading connectome ...")
-    indptr, indices, weights, pops = data.load()
+    indptr, indices, weights, pops, retina_data = data.load()
     brain = Brain(indptr, indices, weights, pops, dt=dt,
                   noise_rate=noise_rate, noise_weight=noise_weight,
                   inh_gain=inh_gain, seed=seed)
-    print(f"[app] brain ready: {brain.n} neurons, "
-          f"{len(indices)} connections — releasing the fly")
+    retina = Retina(retina_data) if vision else None
+    senses = Senses(retina=retina,
+                    loom_injection=0.0 if pure_retina else 0.4)
+    n_photo = (len(retina_data["L_idx"]) + len(retina_data["R_idx"])
+               if vision else 0)
+    print(f"[app] brain ready: {brain.n} neurons, {len(indices)} connections, "
+          f"{n_photo} retinotopic photoreceptors — releasing the fly")
 
-    win = FlyWindow(brain, size=size, hud=hud, vision=vision)
+    win = FlyWindow(brain, senses, size=size, hud=hud, vision=vision)
     win.connect("destroy", Gtk.main_quit)
     try:
         Gtk.main()

@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np
 from fruitfly import data
 from fruitfly.brain import Brain, RateMonitor
-from fruitfly.senses import Senses, SensoryFrame
+from fruitfly.senses import Senses, SensoryFrame, Retina, PATCH
 from fruitfly.motor import MotorMap
 
 W, H = 1920, 1200
@@ -24,16 +24,18 @@ MOTOR_POPS = ["GF", "DNa02_L", "DNa02_R", "DNp09", "MDN", "descending"]
 
 
 def main():
-    indptr, indices, weights, pops = data.load()
+    indptr, indices, weights, pops, retina_data = data.load()
     brain = Brain(indptr, indices, weights, pops, dt=2.0,
                   noise_rate=100.0, noise_weight=3.0, seed=7)
     mon = RateMonitor(brain, MOTOR_POPS)
     gf_mask = np.zeros(brain.n, dtype=bool)
     gf_mask[pops["GF"]] = True
 
-    senses = Senses()
+    senses = Senses(retina=Retina(retina_data))
     motor = MotorMap(W, H)
-    frame = SensoryFrame(cursor_x=1e9, cursor_y=1e9)
+    frame = SensoryFrame(cursor_x=1e9, cursor_y=1e9, patch_dt=1 / 30.0)
+    frame.patch_L = np.full((PATCH, PATCH), 0.5, dtype=np.float32)
+    frame.patch_R = np.full((PATCH, PATCH), 0.5, dtype=np.float32)
 
     tick = 1 / 30.0  # motor updates at 30 fps equivalent
     steps_per_tick = int(tick * 1000 / brain.dt)
@@ -51,8 +53,8 @@ def main():
         else:
             frame.cursor_x, frame.cursor_y = 1e9, 1e9
 
-        stim = senses.rates(frame, motor.st.x, motor.st.y, motor.st.heading, t)
-        threat, bearing = stim.pop("_threat"), stim.pop("_bearing")
+        stim, threat, bearing = senses.rates(
+            frame, motor.st.x, motor.st.y, motor.st.heading, t)
         brain.set_stimulus(stim)
 
         gf_fired = 0

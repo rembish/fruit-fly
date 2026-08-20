@@ -63,6 +63,7 @@ class Brain:
                  noise_rate: float = 0.0, noise_weight: float = 0.0,
                  exc_gain: float = 1.0, inh_gain: float = 1.5,
                  noise_pop: str | None = "central",
+                 lamina_bias: float = 0.0,
                  seed: int | None = None):
         self.p = Params()
         self.dt = float(dt)
@@ -121,6 +122,14 @@ class Brain:
         # so we give it (only it) a higher one.
         self.shift_threshold("GF", +10.0)
 
+        # Lamina monopolar cells are graded, non-spiking neurons held at a
+        # depolarized operating point; photoreceptor histamine inhibition
+        # is released by darkness (the OFF response). A tonic bias current
+        # emulates that operating point in the LIF approximation.
+        self.bias = np.zeros(self.n, dtype=np.float32)
+        if "lamina" in pops and len(pops["lamina"]):
+            self.bias[pops["lamina"]] = np.float32(lamina_bias)
+
         self.t = 0.0            # simulated ms
         self.total_spikes = 0
 
@@ -129,18 +138,30 @@ class Brain:
             self.vth[self.pops[pop]] += delta_mv
 
     # ---------------------------------------------------------------- stim
-    def set_stimulus(self, stim: dict[str, float] | list[tuple[np.ndarray, float]]):
+    def set_stimulus(self, stim: dict[str, float] | list):
         """Set forced firing rates for sensory neurons.
 
-        Accepts {population_name: rate_hz} or [(index_array, rate_hz), ...].
-        Stimulated neurons fire as Poisson processes at the given rate,
-        exactly like the optogenetic-style activation in Shiu et al.
+        Accepts {population_name: rate_hz} or [(indices_or_name, rates), ...]
+        where rates is a scalar Hz or a per-neuron array of Hz (same length
+        as the index array — this is how the retina drives each
+        photoreceptor at its own rate). Stimulated neurons fire as Poisson
+        processes, like the optogenetic-style activation in Shiu et al.
         """
         items = (stim.items() if isinstance(stim, dict) else stim)
         idx_parts, p_parts = [], []
         for key, rate in items:
             idx = self.pops[key] if isinstance(key, str) else key
-            if rate <= 0.0 or len(idx) == 0:
+            if len(idx) == 0:
+                continue
+            if isinstance(rate, np.ndarray):
+                keep = rate > 0.0
+                if not keep.any():
+                    continue
+                idx_parts.append(np.asarray(idx, dtype=np.int32)[keep])
+                p_parts.append((rate[keep] * self.dt * 1e-3)
+                               .astype(np.float32))
+                continue
+            if rate <= 0.0:
                 continue
             idx_parts.append(np.asarray(idx, dtype=np.int32))
             p_parts.append(np.full(len(idx), rate * self.dt * 1e-3,
@@ -176,7 +197,8 @@ class Brain:
         # Integrate everyone unconditionally (fast fused array ops), then
         # clamp the (few) refractory neurons back to reset.
         self.a *= self.decay_a
-        self.v += (dt / p.tau_m) * ((p.v_rest - self.v) + self.s - self.a)
+        self.v += (dt / p.tau_m) * ((p.v_rest - self.v) + self.s - self.a
+                                    + self.bias)
         ref = np.flatnonzero(self.refract > 0)
         if len(ref):
             self.v[ref] = p.v_reset

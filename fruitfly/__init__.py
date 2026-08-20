@@ -15,4 +15,5 @@ DATA_FILES = [
     "classification.csv.gz",
     "neurons.csv.gz",
     "consolidated_cell_types.csv.gz",
+    "column_assignment.csv.gz",
 ]

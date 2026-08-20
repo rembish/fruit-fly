@@ -15,7 +15,7 @@ from fruitfly.brain import Brain, RateMonitor
 
 
 def main():
-    indptr, indices, weights, pops = data.load()
+    indptr, indices, weights, pops, _retina = data.load()
     n = len(indptr) - 1
     print(f"loaded brain: {n} neurons, {len(indices)} connections")
 

@@ -21,7 +21,9 @@ def main(argv=None):
     ap.add_argument("--hud", action="store_true",
                     help="show neural activity HUD overlay")
     ap.add_argument("--no-vision", action="store_true",
-                    help="don't sample screen luminance into photoreceptors")
+                    help="don't sample the screen into the retina")
+    ap.add_argument("--pure-retina", action="store_true",
+                    help="no direct looming injection: trust the eyes only")
     ap.add_argument("--size", type=float, default=34.0, help="fly size, px")
     ap.add_argument("--dt", type=float, default=2.0,
                     help="simulation timestep, ms (smaller = finer + slower)")
@@ -59,7 +61,7 @@ def main(argv=None):
     from .app import run
     run(noise_rate=args.noise, inh_gain=args.inh, dt=args.dt,
         size=args.size, hud=args.hud, vision=not args.no_vision,
-        seed=args.seed)
+        pure_retina=args.pure_retina, seed=args.seed)
 
 
 if __name__ == "__main__":
