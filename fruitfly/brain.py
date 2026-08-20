@@ -12,7 +12,9 @@ reveals sensorimotor processing", Nature 634:210-219):
 
 Differences from the paper (documented, deliberate, for real-time use):
   - exponential (not alpha) synaptic kernel, calibrated to the same peak PSP
-  - default dt = 2.0 ms instead of 0.1 ms
+  - default dt = 2.0 ms instead of 0.1 ms (decay factors are exact,
+    exp(-dt/tau), so dt costs spike-timing resolution but does not
+    rescale the time constants themselves)
   - optional Poisson background noise so the brain has spontaneous activity
     (the paper's network is silent without stimulation; a real brain is not)
   - spike-frequency adaptation (biological, and it stabilizes the network:
@@ -26,6 +28,8 @@ CPU because fly brain activity is sparse.
 """
 
 from __future__ import annotations
+
+import math
 
 import numpy as np
 
@@ -43,16 +47,34 @@ class Params:
     tau_adapt = 500.0   # ms, adaptation decay
 
 
+def _decays(dt: float, p: Params) -> tuple[float, float, float]:
+    """Per-step decay factors (synapse, membrane, adaptation).
+
+    exp(-dt/tau), not the forward-Euler (1 - dt/tau) this used to use.
+    Euler does not merely add error, it silently rescales the model: at
+    dt=2ms it turns tau_syn=5.5 into an effective 4.42ms (-19.5%) and
+    tau_m=20 into 18.98 (-5.1%). The exact factor samples the true
+    continuous exponential at any dt, so dt no longer distorts the
+    kernel and only limits spike-timing resolution. It costs nothing —
+    these are precomputed constants either way.
+    """
+    return (math.exp(-dt / p.tau_syn), math.exp(-dt / p.tau_m),
+            math.exp(-dt / p.tau_adapt))
+
+
 def _psp_calibration(dt: float, p: Params) -> float:
     """Weight w such that one unit-weight synaptic event peaks at psp_peak mV.
 
-    Simulates the linear membrane response to a single synaptic impulse with
-    the same integration scheme used at runtime, then rescales.
+    Simulates the linear membrane response to a single synaptic impulse
+    with the same integration scheme and the same decay factors used at
+    runtime, then rescales. Both must stay in step: this shares _decays
+    with `step` precisely so the two cannot drift apart.
     """
+    decay_s, decay_m, _ = _decays(dt, p)
     s, v, peak = 1.0, 0.0, 0.0
     for _ in range(int(200 / dt)):
-        v += dt * (-v + s) / p.tau_m
-        s -= dt * s / p.tau_syn
+        v = s + (v - s) * decay_m        # v measured from rest; v_inf = s
+        s *= decay_s
         peak = max(peak, v)
     return p.psp_peak / peak
 
@@ -83,10 +105,12 @@ class Brain:
         self.vth = np.full(self.n, self.p.v_thresh, dtype=np.float32)
         self.s = np.zeros(self.n, dtype=np.float32)   # synaptic drive (mV)
         self.a = np.zeros(self.n, dtype=np.float32)   # adaptation (mV)
-        self.decay_a = np.float32(1.0 - self.dt / self.p.tau_adapt)
+        d_s, d_m, d_a = _decays(self.dt, self.p)
+        self.decay_s = np.float32(d_s)
+        self.decay_m = np.float32(d_m)
+        self.decay_a = np.float32(d_a)
         self.refract = np.zeros(self.n, dtype=np.int32)
         self.refract_steps = max(1, int(round(self.p.t_refract / self.dt)))
-        self.decay_s = np.float32(1.0 - self.dt / self.p.tau_syn)
 
         # synaptic delay ring buffer
         self.delay_steps = max(1, int(round(self.p.delay / self.dt)))
@@ -208,9 +232,11 @@ class Brain:
         # membrane integration with spike-frequency adaptation.
         # Integrate everyone unconditionally (fast fused array ops), then
         # clamp the (few) refractory neurons back to reset.
+        # exponential Euler: exact for input held constant over the step,
+        # and unconditionally stable, unlike the forward Euler it replaces
         self.a *= self.decay_a
-        self.v += (dt / p.tau_m) * ((p.v_rest - self.v) + self.s - self.a
-                                    + self.bias)
+        v_inf = p.v_rest + self.s - self.a + self.bias
+        self.v = v_inf + (self.v - v_inf) * self.decay_m
         ref = np.flatnonzero(self.refract > 0)
         if len(ref):
             self.v[ref] = p.v_reset

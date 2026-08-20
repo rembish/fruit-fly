@@ -1,8 +1,12 @@
 """Smoke tests: speed, silence at rest, and the escape circuit.
 
+The two integration tests at the bottom need no connectome and so run
+under pytest on any machine; `main()` is the full smoke run.
+
 Run:  python3 tests/test_brain.py
 """
 
+import math
 import os
 import sys
 import time
@@ -10,7 +14,13 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from fruitfly import data
-from fruitfly.brain import Brain, RateMonitor
+from fruitfly.brain import (
+    Brain,
+    Params,
+    RateMonitor,
+    _decays,
+    _psp_calibration,
+)
 
 
 def main():
@@ -67,5 +77,52 @@ def main():
           f"{0.5/wall:.2f}x real time")
 
 
+def test_decays_are_exact_not_euler():
+    """Decay factors must be exp(-dt/tau), never forward Euler.
+
+    Forward Euler does not merely add error here, it rescales the model:
+    1 - dt/tau at dt=2ms turns tau_syn=5.5 into an effective 4.42ms,
+    -19.5%, and tau_m=20 into 18.98. The network was quietly running
+    with time constants nobody chose.
+    """
+    p = Params()
+    for dt in (2.0, 1.0, 0.5, 0.1):
+        d_s, d_m, d_a = _decays(dt, p)
+        for got, tau, name in ((d_s, p.tau_syn, "tau_syn"),
+                               (d_m, p.tau_m, "tau_m"),
+                               (d_a, p.tau_adapt, "tau_adapt")):
+            exact = math.exp(-dt / tau)
+            euler = 1.0 - dt / tau
+            assert abs(got - exact) < 1e-12, \
+                f"{name} at dt={dt} is not exp(-dt/tau)"
+            if abs(exact - euler) > 1e-6:      # dt/tau big enough to tell
+                assert abs(got - euler) > 1e-9, \
+                    f"{name} at dt={dt} regressed to forward Euler"
+    print("decay factors are exact exponentials at every dt")
+
+
+def test_psp_calibration_converges_to_analytic():
+    """As dt shrinks, the calibrated weight must approach the real answer.
+
+    For an exponential synapse driving a leaky membrane, the impulse
+    response is analytic, so the discretisation has a ground truth to
+    converge to. This is what catches a calibration that silently stops
+    matching the integration scheme it is supposed to mirror.
+    """
+    p = Params()
+    ts, tm = p.tau_syn, p.tau_m
+    t_peak = math.log(tm / ts) / (1 / ts - 1 / tm)
+    peak = ts / (ts - tm) * (math.exp(-t_peak / ts) - math.exp(-t_peak / tm))
+    want = p.psp_peak / peak
+    err = [abs(_psp_calibration(dt, p) - want) / want
+           for dt in (1.0, 0.1, 0.01)]
+    assert err[0] > err[1] > err[2], f"not converging: {err}"
+    assert err[2] < 0.005, f"dt=0.01 still {100*err[2]:.2f}% off analytic"
+    print(f"PSP calibration converges to analytic "
+          f"({100*err[2]:.2f}% at dt=0.01)")
+
+
 if __name__ == "__main__":
+    test_decays_are_exact_not_euler()
+    test_psp_calibration_converges_to_analytic()
     main()
