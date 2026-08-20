@@ -21,7 +21,11 @@ if TYPE_CHECKING:
 try:
     import gi
 
+    # Every namespace needs its version pinned BEFORE the import line:
+    # these names are imported in alphabetical order, so Gdk loads first
+    # and would otherwise default to 4.0 and collide with GTK 3.
     gi.require_version("Gtk", "3.0")
+    gi.require_version("Gdk", "3.0")
     from gi.repository import Gdk, GLib, Gtk
 
     _IMPORT_ERROR: Exception | None = None

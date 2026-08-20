@@ -76,7 +76,7 @@ def build(hud=False, vision=True):
 
 
 def test_registry():
-    assert set(ui.REGISTRY) >= {"gtk", "cocoa"}
+    assert set(ui.REGISTRY) >= {"gtk", "cocoa", "win32"}
     for name in sorted(ui.REGISTRY):
         cls = ui.load(name)                     # must import on any platform
         assert issubclass(cls, Host), name
@@ -87,6 +87,28 @@ def test_registry():
         assert not missing, f"{name} leaves abstract: {missing}"
         print(f"  backend {name:6s} available={ok} {why[:60]}")
     print("registry + interface conformance OK")
+
+
+def test_native_backend_is_usable():
+    """The backend for THIS platform must actually work, not just import.
+
+    Without this, a backend that breaks at import time still 'passes' —
+    available() catches the exception and returns False, which the
+    conformance check above happily accepts. That is exactly how a
+    toolkit-version regression slipped through once.
+    """
+    order = ui.PLATFORM_ORDER.get(sys.platform, [])
+    if not order:
+        print(f"no native backend for {sys.platform!r} — skipped")
+        return
+    if sys.platform.startswith("linux") and not os.environ.get("DISPLAY"):
+        print("no DISPLAY (headless) — native backend check skipped")
+        return
+    native = order[0]
+    ok, why = ui.load(native).available()
+    assert ok, (f"native backend {native!r} is unusable on {sys.platform}: "
+                f"{why}")
+    print(f"native backend {native!r} reports usable OK")
 
 
 def test_controller_loop():
@@ -197,6 +219,7 @@ def test_hit_radius():
 
 if __name__ == "__main__":
     test_registry()
+    test_native_backend_is_usable()
     test_controller_loop()
     test_grab_bounds_at_screen_edges()
     test_blind_host_survives()
