@@ -16,9 +16,9 @@ which is why smaller dt costs so much and buys so little.
 Measuring the two separately matters. The obvious approach — run each
 candidate dt for a moment and time it — is measuring a transient:
 adaptation equilibrates over tau_adapt = 500 ms and the noise-floor
-governor has a 500 ms EMA on top, so a short burst samples an arbitrary point of
-each candidate's own ramp-up, and the candidates are not comparable to
-each other. D is measured on a silenced brain where there is no transient
+governor has a 500 ms EMA on top, so a short burst samples an arbitrary
+point of each candidate's own ramp-up, and the candidates are not
+comparable to each other. D is measured on a silenced brain where there is no transient
 to be caught by, and the firing rate is measured once, warm.
 """
 
@@ -46,7 +46,10 @@ LADDER = (2.0, 1.0, 0.5)
 #: network fires more, and the motor map's thresholds were calibrated
 #: against the coarse rate — so the "more accurate" fly never lands.
 #: Auto-selecting per machine would hand fast machines a broken fly.
-#: Widen this only together with a motor retune and a fresh test run.
+#: `python3 -m fruitfly calibrate --dt 0.5` derives the retune, which
+#: does rescue the finer steps (dt=0.5 goes from landed 0.6s and FAIL to
+#: landed 6.9s and PASS with recalibrated thresholds). Auto-select still
+#: will not pick them, because it cannot edit motor.py for you.
 AUTO_MENU = (2.0,)
 
 #: core.py grabs two eye patches on every third 60 Hz tick.

@@ -3,6 +3,7 @@
 Commands:
   run        (default) release the fly onto the desktop
   benchmark  measure what timestep this machine can sustain
+  calibrate  re-derive the motor thresholds for a changed brain
   fetch      download the FlyWire connectome data (~50 MB)
   prepare    compile the raw tables into data/brain.npz
   test       headless behavioral test (no window)
@@ -28,7 +29,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="fruitfly", description=__doc__)
     ap.add_argument("command", nargs="?", default="run",
                     choices=["run", "fetch", "prepare", "test",
-                             "benchmark"])
+                             "benchmark", "calibrate"])
     ap.add_argument("--hud", action="store_true",
                     help="show neural activity HUD overlay")
     ap.add_argument("--no-vision", action="store_true",
@@ -51,6 +52,8 @@ def main(argv=None):
                     help="let screen recorders see the fly (Windows hides "
                          "it from capture so it cannot see itself); the "
                          "fly may then react to its own image")
+    ap.add_argument("--calib-seconds", type=float, default=120.0,
+                    help="simulated seconds per trace for `calibrate`")
     ap.add_argument("--seed", type=int, default=None)
     args = ap.parse_args(argv)
 
@@ -75,6 +78,18 @@ def main(argv=None):
         print("[bench] loading connectome ...")
         indptr, indices, weights, pops, _retina = data.load()
         print(format_table(measure(indptr, indices, weights, pops)))
+        return
+
+    if args.command == "calibrate":
+        from .calibrate import format_result, recalibrate  # noqa: PLC0415
+        dt = 2.0 if args.dt == "auto" else args.dt
+        print(f"[calib] capturing descending traces "
+              f"({args.calib_seconds:.0f} simulated seconds each) ...")
+        indptr, indices, weights, pops, _retina = data.load()
+        print(format_result(recalibrate(
+            indptr, indices, weights, pops, dt=dt,
+            seconds=args.calib_seconds, noise_rate=args.noise,
+            inh_gain=args.inh)))
         return
 
     if args.command == "test":
