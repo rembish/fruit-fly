@@ -14,6 +14,13 @@ synapses, exactly the circuit a living fly uses to evade your rolled-up
 newspaper. When it takes off, lands, or jinks for no reason at all — a
 neuron decided to.
 
+![A fruit fly walking and flying across a desktop, over this README, while a
+terminal beside it logs the neurons firing behind each move](docs/demo.gif)
+
+On the right, the fly crosses its own README. On the left, its log: every
+jink, saccade and `ESCAPE!` in that recording is a real neuron reaching
+threshold, printed as it happens.
+
 ## How it works
 
 ```
