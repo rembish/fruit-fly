@@ -57,7 +57,10 @@ packages = ["fruitfly", "fruitfly.ui"]
 version = { attr = "fruitfly.__version__" }
 
 [project.optional-dependencies]
-dev = ["ruff>=0.5", "mypy>=1.8"]
+# pytest collects the fast checks; the slower suites in tests/ are also
+# runnable directly as scripts, which is how the ones needing the
+# connectome are meant to be run. See tests/README or `## Tests` below.
+dev = ["ruff>=0.5", "mypy>=1.8", "pytest>=7", "coverage>=7"]
 
 [tool.ruff]
 line-length = 79

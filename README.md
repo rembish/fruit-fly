@@ -314,6 +314,33 @@ What is added or approximated, and why:
   watching one animal's brain. A chimera of two flies is not the complete
   real brain of a fruit fly. The invented motor map stays.
 
+## Tests
+
+```bash
+pip install -e ".[dev]"
+pytest                             # the fast checks, ~3 s, no brain needed
+```
+
+`pytest` collects what runs anywhere in seconds. Three suites are
+deliberately *not* collected: they need the compiled connectome, take
+tens of seconds, and are written to be read as much as run, so they are
+plain scripts.
+
+```bash
+python3 tests/test_brain.py        # silence at rest, escape circuit, speed
+python3 tests/test_behavior.py     # 30 s of closed-loop desktop life
+python3 tests/test_behavior.py 0.5 # ... at a different timestep
+python3 tests/test_retina.py       # retinotopy, and looming through the eyes
+```
+
+Coverage is **44%** from `pytest` alone and **53%** with the script
+suites as well (`coverage run -a --source=fruitfly tests/test_brain.py`,
+and so on). Most of the remainder is code that cannot run headless on one
+machine: the three window backends, `app.py` and `__main__.py`, which
+exist to wire the fly to a screen, and the fetch/compile half of
+`data.py`. The parts that decide how the fly behaves are where the
+coverage is — `senses` 100%, `brain` 91%, `motor` 87%, `sprite` 86%.
+
 ## Layout
 
 ```
