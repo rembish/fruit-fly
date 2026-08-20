@@ -70,6 +70,9 @@ ignore = [
     "PLR2004",  # magic values: biological constants read better inline
     "PLR0912",  # branches: the motor state machine is one honest chain
     "PLR0915",  # statements, same
+    "PLR0917",  # positional args: the four connectome arrays travel
+                # together everywhere, and splitting them up to please a
+                # counter would obscure that they are one thing
 ]
 
 [tool.ruff.lint.per-file-ignores]

@@ -201,8 +201,10 @@ def prepare(root: str | None = None, min_synapses: int = 5) -> str:
     }
     arrays.update({f"pop_{k}": v for k, v in pops.items()})
     arrays.update({f"retina_{k}": v for k, v in retina.items()})
-    # numpy stubs bind **kwargs to allow_pickle here
-    np.savez_compressed(out_path, **arrays)  # type: ignore[arg-type]
+    # numpy stubs bind **kwargs to allow_pickle here. unused-ignore is
+    # listed too because newer stubs no longer need the arg-type silence,
+    # and warn_unused_ignores would then fail on the silence itself.
+    np.savez_compressed(out_path, **arrays)  # type: ignore[arg-type,unused-ignore]
     meta = {
         "n_neurons": int(n),
         "n_connections": int(len(upost)),
