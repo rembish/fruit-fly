@@ -1,7 +1,13 @@
 # Pinned to the versions this project was developed and tested against.
-# PyGObject/pycairo: prefer your distro packages (python3-gi, python3-gi-cairo,
-# gir1.2-gtk-3.0) and a venv created with --system-site-packages; pip-building
-# these two requires GTK development headers (libgirepository1.0-dev, libcairo2-dev).
+#
+# Linux: prefer your distro packages for PyGObject/pycairo (python3-gi,
+# python3-gi-cairo, gir1.2-gtk-3.0) and a venv created with
+# --system-site-packages; pip-building those two needs GTK development
+# headers (libgirepository1.0-dev, libcairo2-dev).
+#
+# macOS: `brew install cairo` first so pycairo can build, then pip install.
 numpy==2.4.6
-PyGObject==3.48.2
 pycairo==1.25.1
+PyGObject==3.48.2; sys_platform == "linux"
+pyobjc-framework-Cocoa>=10.0; sys_platform == "darwin"
+pyobjc-framework-Quartz>=10.0; sys_platform == "darwin"

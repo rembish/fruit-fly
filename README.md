@@ -49,21 +49,40 @@ from fly electrophysiology. Connectivity comes straight from the public
 [FlyWire Codex](https://codex.flywire.ai/) data dump (snapshot 783,
 downloaded on first run, ~50 MB).
 
-## Install & run (MATE / any X11 desktop with compositing)
+## Install & run
 
-Dependencies: GTK3 via GObject introspection plus numpy. On Debian/Ubuntu/Mint:
+The brain, senses, motor and the cairo-drawn sprite are shared; only the
+window layer is per-platform, in `fruitfly/ui/` (see
+[`ui/base.py`](fruitfly/ui/base.py) for the interface a backend
+implements).
+
+| platform | backend | needs |
+|---|---|---|
+| Linux (X11, or Wayland via XWayland) | `gtk` | GTK3 + PyGObject, a compositing WM |
+| macOS 10.15+ | `cocoa` | PyObjC, Screen Recording permission for vision |
+
+**Linux** (Debian/Ubuntu/Mint):
 
 ```bash
 sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0 python3-numpy
-```
-
-then, from the repo:
-
-```bash
 python3 -m fruitfly            # downloads + compiles the brain on first run
 ```
 
-or install it:
+**macOS** (Homebrew):
+
+```bash
+brew install cairo             # pycairo needs it to build
+pip3 install pyobjc-framework-Cocoa pyobjc-framework-Quartz pycairo numpy
+python3 -m fruitfly
+```
+
+On first launch macOS will ask for **Screen Recording** permission —
+that is the fly's eyesight (it reads the pixels around itself). Decline
+and it still flies, just blind; grant it in System Settings → Privacy &
+Security → Screen Recording and restart. No Accessibility permission is
+needed: swat detection uses the window's own hit-testing.
+
+Or install the package on either platform:
 
 ```bash
 python3 -m venv --system-site-packages .venv && . .venv/bin/activate
@@ -80,6 +99,7 @@ fruitfly --pure-retina  no looming injection: escapes only via the real eyes
 fruitfly --no-vision    don't sample the screen into the retina
 fruitfly --noise 140    more spontaneous brain activity (a more annoying fly)
 fruitfly --dt 1.0       finer integration (slower; default 2.0 ms)
+fruitfly --backend gtk  force a window backend (gtk, cocoa); default: auto
 fruitfly test           headless 30 s behavioral test, no window
 ```
 
@@ -105,9 +125,9 @@ mortal**:
 
 The HUD keeps score.
 
-Quit with Ctrl-C in the terminal. Requires a compositing window manager
-for transparency (MATE: System → Preferences → Windows → enable
-compositing).
+Quit with Ctrl-C in the terminal. On Linux this needs a compositing
+window manager for transparency (MATE: System → Preferences → Windows →
+enable compositing); macOS always composites.
 
 ## Things to try
 
@@ -171,9 +191,18 @@ fruitfly/brain.py    event-driven whole-brain LIF engine (numpy)
 fruitfly/senses.py   retinotopic eyes: pixels -> photoreceptors & lamina
 fruitfly/motor.py    descending neurons -> flight kinematics
 fruitfly/sprite.py   the fly, in cairo
-fruitfly/app.py      transparent click-through GTK overlay + brain thread
-tests/               circuit, retina-emergence and closed-loop tests
+fruitfly/core.py     platform-independent controller + brain thread
+fruitfly/ui/base.py  the Host interface a window backend implements
+fruitfly/ui/gtk.py   Linux/X11 backend
+fruitfly/ui/cocoa.py macOS backend
+fruitfly/app.py      wires brain + senses + backend together
+tests/               circuit, retina, closed-loop and backend-contract tests
 ```
+
+Porting to another window system means implementing one class: five
+methods (screen size, pointer, screen grab, move window, redraw) plus
+event-loop wiring. `tests/test_backends.py` checks any backend against
+the contract with a headless fake host.
 
 Data credit: [FlyWire](https://flywire.ai/) (Dorkenwald et al., Schlegel et
 al., *Nature* 2024), used under its public data terms. Model design after
