@@ -32,9 +32,10 @@ EYE_RADIUS = 120.0  # px of screen each eye sees (half-width of patch)
 class Retina:
     """Maps screen patches onto photoreceptor firing rates, per column."""
 
-    # Photoreceptors release continuously in the light; their tonic rate
-    # must be high enough that the (histaminergic, inhibitory) drive holds
-    # the biased lamina cells quiet — darkness then disinhibits (OFF).
+    # Photoreceptors release continuously in the light. Their drive is
+    # histaminergic and so inhibitory in the compiled connectome, which is
+    # what the medulla reads; the lamina's own OFF transfer function is
+    # injected below rather than left to emerge from it.
     R_TONIC = 5.0     # Hz in darkness
     GAIN = 40.0       # Hz per unit of contrast (lum - baseline)
     LUM_GAIN = 45.0   # Hz per unit of absolute luminance

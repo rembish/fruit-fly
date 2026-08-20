@@ -311,10 +311,11 @@ def _build_retina(d, cls, to_index, indptr, upost, w):
         print(f"[prepare] {letter} retina: {len(out[f'{letter}_idx'])} "
               f"photoreceptors + {len(lam_idx[letter])} L1-L3 mapped")
 
-    # lamina monopolar cells (both eyes): these are graded, non-spiking
-    # neurons in the real fly, held at a depolarized operating point so
-    # photoreceptor (histamine) inhibition can be released by darkness.
-    # The Brain gives them a tonic bias to emulate that operating point.
+    # lamina monopolar cells (both eyes): graded, non-spiking neurons in
+    # the real fly. Their OFF transfer function is computed in senses.py
+    # and injected, rather than emerging from the real photoreceptor
+    # synapses -- their output synapses are real either way, which is
+    # what produces the ON/OFF split downstream.
     lam_all = np.isin(ctype, ["L1", "L2", "L3", "L4", "L5"])
     lamina = np.unique(t_idx[lam_all]).astype(np.int32)
     return out, lamina

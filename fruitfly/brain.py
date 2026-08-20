@@ -85,7 +85,6 @@ class Brain:
                  noise_rate: float = 0.0, noise_weight: float = 0.0,
                  exc_gain: float = 1.0, inh_gain: float = 1.5,
                  noise_pop: str | None = "central",
-                 lamina_bias: float = 0.0,
                  seed: int | None = None):
         self.p = Params()
         self.dt = float(dt)
@@ -151,13 +150,15 @@ class Brain:
         # so we give it (only it) a higher one.
         self.shift_threshold("GF", +10.0)
 
-        # Lamina monopolar cells are graded, non-spiking neurons held at a
-        # depolarized operating point; photoreceptor histamine inhibition
-        # is released by darkness (the OFF response). A tonic bias current
-        # emulates that operating point in the LIF approximation.
+        # Per-neuron tonic current, in mV. Zero everywhere today, and
+        # deliberately so: it used to carry a `lamina_bias` argument that
+        # nothing ever passed, which meant the "depolarized operating
+        # point" the lamina cells are documented as having did not exist.
+        # Biasing them so real histamine inhibition could be released by
+        # darkness was measured and rejected — see the lamina note in the
+        # README. The hook stays because that is where such a current
+        # would go.
         self.bias = np.zeros(self.n, dtype=np.float32)
-        if "lamina" in pops and len(pops["lamina"]):
-            self.bias[pops["lamina"]] = np.float32(lamina_bias)
 
         self.t = 0.0            # simulated ms
         self.total_spikes = 0

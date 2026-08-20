@@ -193,7 +193,28 @@ What is added or approximated, and why:
   produces nothing). Their textbook transfer functions — adaptive
   phototransduction, and the lamina's transient OFF response to local
   darkening — are computed in the sensory layer and injected at L1/L2/L3
-  per column. Everything from the medulla onward is the real network.
+  per column. The real network begins at the lamina's *output* synapses,
+  not at the medulla.
+
+  What that boundary still buys is more than it sounds. The ON/OFF split
+  is not injected, it is wired: in the compiled connectome L1's output is
+  99.6% inhibitory (glutamate and GABA) while L2's is 99.6% and L3's
+  99.8% cholinergic. So the sign inversion that builds the ON pathway is
+  the real circuit's, and it operates on whatever the injection feeds it.
+
+  Letting the OFF response emerge instead — biasing the lamina cells to a
+  depolarized point and letting real histamine inhibition be released by
+  darkness — was measured and rejected. Photoreceptor input per lamina
+  cell spans 5 to 111 synapses, so no single bias fits: the weakly-driven
+  cells fire constantly and the strongly-driven ones never fire. A
+  per-neuron bias derived from each cell's own afferents fixes that and
+  still fails, because Poisson shot noise on those inputs is about 6 mV
+  against a 7 mV threshold gap — the cell cannot tell darkness from a gap
+  in its own input. And 30% of the L1-L3 cells have no photoreceptor
+  afferent at all in the compiled graph, so those columns would go blind.
+  The honest summary is that a spiking model cannot represent a graded
+  synapse by discretising it; the fix is graded transmission, not a
+  cleverer bias.
 - **Background noise** (Poisson, central brain only): the connectome alone
   is silent — a network with no input never fires. Real brains have
   intrinsic noise and neuromodulation; ours is the source of all

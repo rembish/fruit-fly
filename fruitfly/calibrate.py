@@ -21,6 +21,11 @@ and read the Hz off at those same quantiles.
 That makes a retune mechanical rather than a matter of taste, which is
 what any future change to excitability needs — a finer dt, dropping
 monoamines out of fast excitation, adding neuromodulatory gain.
+
+Scope, so this is not oversold: it re-derives LAND_REF and TAKEOFF_REF
+and nothing else. A change in excitability also moves the giant fiber
+statistics that ESCAPE_GF_HZ is set against, and the jink rate, and how
+often the fly hallucinates a looming cursor. Those are still by hand.
 """
 
 from __future__ import annotations
