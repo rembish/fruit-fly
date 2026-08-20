@@ -171,13 +171,22 @@ every input/output circuit used (photoreceptors, lamina, LC4/LPLC2 looming
 detectors, giant fiber, DNa02 steering neurons, DNp09, MDN, the descending
 pool).
 
+What is corrected — not an approximation, a repair of a known defect in
+the source data:
+
+- **Histamine sign**: photoreceptors release histamine, which is
+  inhibitory, and that inhibition *is* the ON/OFF pathway split. The
+  FlyWire neurotransmitter classifier has no histamine class at all and
+  so mislabels ~74% of photoreceptor outputs as excitatory. Their
+  outgoing sign is forced negative during compilation. Without this the
+  ON/OFF pathways are scrambled, so this moves the model toward the real
+  fly rather than away from it. The principled generalisation, not done
+  here, would be to take the neurotransmitter from curated per-cell-type
+  literature wherever it is known and fall back to the classifier only
+  otherwise.
+
 What is added or approximated, and why:
 
-- **Histamine sign correction**: photoreceptors release histamine
-  (inhibitory), but the FlyWire NT classifier has no histamine class and
-  mislabels ~74% of their outputs as excitatory. Their outgoing sign is
-  forced negative during compilation — without this the ON/OFF pathways
-  are scrambled.
 - **Graded-neuron transduction**: photoreceptors and lamina monopolar
   cells are non-spiking, graded neurons in the real fly, which a spiking
   LIF model represents poorly (inhibition released onto a silent neuron
