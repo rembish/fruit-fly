@@ -204,8 +204,15 @@ What is added or approximated, and why:
   stimulates it for fractions of a second from silence). Adaptation is
   biologically standard and gives the network self-quenching bursts.
 - **Exponential synapses, dt = 2 ms** instead of alpha synapses at 0.1 ms:
-  calibrated to the same single-synapse PSP peak (0.275 mV), traded for
-  real-time speed.
+  calibrated to the same single-synapse PSP peak (0.275 mV). The decay
+  factors are exact, `exp(-dt/tau)`, so dt costs spike-timing resolution
+  but does not rescale the time constants. `python3 -m fruitfly benchmark`
+  measures what your machine sustains. Note that dt is not purely a speed
+  knob: finer steps resolve coincidences the coarse step merged, the
+  network fires more, and the motor map was calibrated against the coarse
+  rate — at dt=0.5 the fly stops landing altogether (landed 15.4s of 30s
+  at dt=2.0, 0.6s at dt=0.5). Going finer needs a motor retune, which is
+  why `--dt auto` will not choose it for you.
 - **A higher giant-fiber threshold and rate-based motor readout**: the real
   GF is a huge neuron famous for its high threshold; and real motor
   circuits threshold their drive — the wing motor neurons live in the

@@ -2,6 +2,7 @@
 
 Commands:
   run        (default) release the fly onto the desktop
+  benchmark  measure what timestep this machine can sustain
   fetch      download the FlyWire connectome data (~50 MB)
   prepare    compile the raw tables into data/brain.npz
   test       headless behavioral test (no window)
@@ -16,10 +17,18 @@ import sys
 from . import data
 
 
+def _dt(value: str):
+    """--dt takes milliseconds, or 'auto' to measure this machine."""
+    if value.strip().lower() == "auto":
+        return "auto"
+    return float(value)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="fruitfly", description=__doc__)
     ap.add_argument("command", nargs="?", default="run",
-                    choices=["run", "fetch", "prepare", "test"])
+                    choices=["run", "fetch", "prepare", "test",
+                             "benchmark"])
     ap.add_argument("--hud", action="store_true",
                     help="show neural activity HUD overlay")
     ap.add_argument("--no-vision", action="store_true",
@@ -30,8 +39,10 @@ def main(argv=None):
                     help="force a window backend (gtk, cocoa); "
                          "default: auto-detect for this platform")
     ap.add_argument("--size", type=float, default=34.0, help="fly size, px")
-    ap.add_argument("--dt", type=float, default=2.0,
-                    help="simulation timestep, ms (smaller = finer + slower)")
+    ap.add_argument("--dt", type=_dt, default=2.0,
+                    help="simulation timestep, ms (smaller = finer + "
+                         "slower), or 'auto' to benchmark this machine "
+                         "and pick the finest it can sustain")
     ap.add_argument("--noise", type=float, default=100.0,
                     help="background noise rate, Hz (spontaneity)")
     ap.add_argument("--inh", type=float, default=1.5,
@@ -58,6 +69,13 @@ def main(argv=None):
               "(one-time, ~50 MB download)")
         data.fetch()
         data.prepare()
+
+    if args.command == "benchmark":
+        from .bench import format_table, measure  # noqa: PLC0415
+        print("[bench] loading connectome ...")
+        indptr, indices, weights, pops, _retina = data.load()
+        print(format_table(measure(indptr, indices, weights, pops)))
+        return
 
     if args.command == "test":
         os.execv(sys.executable, [sys.executable, os.path.join(

@@ -23,9 +23,9 @@ W, H = 1920, 1200
 MOTOR_POPS = ["GF", "DNa02_L", "DNa02_R", "DNp09", "MDN", "descending"]
 
 
-def main():
+def main(dt=2.0):
     indptr, indices, weights, pops, retina_data = data.load()
-    brain = Brain(indptr, indices, weights, pops, dt=2.0,
+    brain = Brain(indptr, indices, weights, pops, dt=dt,
                   noise_rate=100.0, noise_weight=3.0, seed=7)
     mon = RateMonitor(brain, MOTOR_POPS)
     gf_mask = np.zeros(brain.n, dtype=bool)
@@ -91,4 +91,6 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    # optional dt argument: the timesteps bench.DT_MENU offers must each
+    # be run through this before auto-select is allowed to pick them
+    sys.exit(main(float(sys.argv[1]) if len(sys.argv) > 1 else 2.0))
