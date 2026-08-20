@@ -1,7 +1,9 @@
 """Win32 backend — Windows, via ctypes. No extra Python dependency.
 
-UNTESTED ON HARDWARE: written against the documented Win32 APIs but
-developed on Linux. Please report what breaks.
+Developed on Linux against the documented Win32 APIs, and since run on
+64-bit Windows: the fly appears, flies and is visible. The click-through
+and screen-capture paths have had only light use, so please report what
+breaks. Note that ctypes signatures must stay declared — see _declare.
 
 Design notes:
   * the fly lives in a WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_NOACTIVATE
