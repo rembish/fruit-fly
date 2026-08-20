@@ -18,8 +18,8 @@ candidate dt for a moment and time it — is measuring a transient:
 adaptation equilibrates over tau_adapt = 500 ms and the noise-floor
 governor has a 500 ms EMA on top, so a short burst samples an arbitrary
 point of each candidate's own ramp-up, and the candidates are not
-comparable to each other. D is measured on a silenced brain where there is no transient
-to be caught by, and the firing rate is measured once, warm.
+comparable to each other. D is measured on a silenced brain, which has
+no transient to be fooled by, and the firing rate is measured once, warm.
 """
 
 from __future__ import annotations
