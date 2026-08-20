@@ -39,8 +39,14 @@ class Host(abc.ABC):
     #: human-readable, for error messages
     description: str = ""
 
-    def __init__(self, hud: bool = False) -> None:  # noqa: B027
+    def __init__(self, hud: bool = False,  # noqa: B027
+                 recordable: bool = False) -> None:
         """Create the fly window, plus the telemetry panel if `hud`.
+
+        `recordable` asks a backend that hides its own windows from the
+        OS screen-capture path to stop doing so, so a screen recorder
+        can see the fly. The cost is that the fly may then see itself.
+        Only Win32 hides itself this way; the others ignore the flag.
 
         Not abstract: a backend needing no setup may inherit this.
         """

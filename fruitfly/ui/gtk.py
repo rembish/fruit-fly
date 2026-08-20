@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import contextlib
 import os
+import sys
 from typing import TYPE_CHECKING
 
 import cairo
@@ -83,9 +84,19 @@ class GtkHost(Host):
                 f"X11/XWayland — check DISPLAY, or force GDK_BACKEND=x11.")
         return True, ""
 
-    def __init__(self, hud: bool = False):
+    def __init__(self, hud: bool = False,
+                 recordable: bool = False):  # noqa: ARG002 - never hides
         if _IMPORT_ERROR is not None:
             raise RuntimeError(self.available()[1])
+        if _UNDER_WSL:
+            print("[gtk] WSLg detected. The fly will be blind here — WSLg "
+                  "gives X no desktop to grab, so the retina only ever "
+                  "sees black — and its window will keep taking the "
+                  "Windows foreground away from whatever you are typing "
+                  "into. Run the native Windows build instead for a fly "
+                  "that sees your screen and leaves your focus alone:\n"
+                  "    python -m fruitfly run   (from PowerShell)",
+                  file=sys.stderr)
         self.screen = Gdk.Screen.get_default()
         if self.screen is None:
             raise RuntimeError("no display — is DISPLAY set?")
@@ -96,24 +107,12 @@ class GtkHost(Host):
         self.controller: Controller | None = None
 
     def _layer_window(self, w: int, h: int):
-        if _UNDER_WSL:
-            # WSLg hands every X window to msrdc, which keeps re-activating
-            # it as the Windows foreground window unless it has been told
-            # the window is non-activating. An override-redirect POPUP
-            # carries no WM hints at all, so that never gets said and
-            # typing anywhere else is interrupted continuously — measured
-            # here, focus was stolen back from Windows Terminal 91ms and
-            # 97ms after it was handed over. A managed TOPLEVEL does carry
-            # the hints, and steals nothing.
-            win = Gtk.Window(type=Gtk.WindowType.TOPLEVEL)
-            win.set_decorated(False)
-            win.set_type_hint(Gdk.WindowTypeHint.NOTIFICATION)
-        else:
-            # Elsewhere keep the POPUP. Override-redirect means move() is
-            # exact and immediate at 60Hz, which is what the fly needs and
-            # what no window manager promises. Only switch this after
-            # measuring focus behaviour on the desktop in question.
-            win = Gtk.Window(type=Gtk.WindowType.POPUP)
+        # Override-redirect: move() is then exact and immediate at 60Hz,
+        # and the window keeps its RGBA visual. A managed TOPLEVEL was
+        # tried to stop WSLg's foreground stealing and gives up both --
+        # measured under WSLg, a NOTIFICATION toplevel rendered an opaque
+        # box and DOCK/plain toplevels ignored move() entirely.
+        win = Gtk.Window(type=Gtk.WindowType.POPUP)
         win.set_default_size(w, h)
         win.set_app_paintable(True)
         win.set_keep_above(True)

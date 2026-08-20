@@ -37,14 +37,15 @@ def load(name: str) -> type[Host]:
     return getattr(importlib.import_module(module), cls)
 
 
-def create_host(hud: bool = False, backend: str | None = None) -> Host:
+def create_host(hud: bool = False, backend: str | None = None,
+                recordable: bool = False) -> Host:
     """Instantiate the best available backend for this platform."""
     if backend:
         cls = load(backend)
         ok, why = cls.available()
         if not ok:
             raise RuntimeError(f"backend {backend!r} unavailable: {why}")
-        return cls(hud=hud)
+        return cls(hud=hud, recordable=recordable)
 
     order = PLATFORM_ORDER.get(sys.platform, [])
     if not order:
@@ -62,7 +63,7 @@ def create_host(hud: bool = False, backend: str | None = None) -> Host:
             continue
         ok, why = cls.available()
         if ok:
-            return cls(hud=hud)
+            return cls(hud=hud, recordable=recordable)
         problems.append(f"{name}: {why}")
     raise RuntimeError("no usable window backend:\n  "
                        + "\n  ".join(problems))

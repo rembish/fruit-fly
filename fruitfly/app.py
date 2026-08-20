@@ -12,7 +12,8 @@ from .ui import create_host
 def run(noise_rate: float = 100.0, noise_weight: float = 3.0,
         inh_gain: float = 1.5, dt: float = 2.0, size: float = 34.0,
         hud: bool = False, vision: bool = True, pure_retina: bool = False,
-        backend: str | None = None, seed: int | None = None):
+        backend: str | None = None, seed: int | None = None,
+        recordable: bool = False):
     print("[app] loading connectome ...")
     indptr, indices, weights, pops, retina_data = data.load()
     brain = Brain(indptr, indices, weights, pops, dt=dt,
@@ -24,7 +25,7 @@ def run(noise_rate: float = 100.0, noise_weight: float = 3.0,
     n_photo = (len(retina_data["L_idx"]) + len(retina_data["R_idx"])
                if vision else 0)
 
-    host = create_host(hud=hud, backend=backend)
+    host = create_host(hud=hud, backend=backend, recordable=recordable)
     controller = Controller(brain, senses, host, size=size, vision=vision)
     host.attach(controller)
 

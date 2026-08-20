@@ -245,10 +245,13 @@ class _LayeredWindow:
             raise ctypes.WinError(ctypes.get_last_error())  # type: ignore[attr-defined]  # type: ignore[attr-defined]
         host.windows[self.hwnd] = self
 
-        # keep the fly out of its own eyes (Windows 10 2004+; ignore if old)
-        with contextlib.suppress(Exception):
-            user32.SetWindowDisplayAffinity(self.hwnd,
-                                            WDA_EXCLUDEFROMCAPTURE)
+        # Keep the fly out of its own eyes (Windows 10 2004+; ignore if
+        # old). This hides it from *every* capture path, screen recorders
+        # included, so --recordable turns it off to film the fly.
+        if not host._recordable:
+            with contextlib.suppress(Exception):
+                user32.SetWindowDisplayAffinity(self.hwnd,
+                                                WDA_EXCLUDEFROMCAPTURE)
 
         self.screen_dc = user32.GetDC(None)
         self.mem_dc = gdi32.CreateCompatibleDC(self.screen_dc)
@@ -294,12 +297,13 @@ class Win32Host(Host):
             return False, f"not a Windows system ({_IMPORT_ERROR})"
         return True, ""
 
-    def __init__(self, hud: bool = False):
+    def __init__(self, hud: bool = False, recordable: bool = False):
         if _IMPORT_ERROR is not None:
             raise RuntimeError(self.available()[1])
         self.controller: Controller | None = None
         self.windows: dict = {}
         self._quit = False
+        self._recordable = recordable
         self._capture: tuple | None = None
 
         self._set_dpi_aware()

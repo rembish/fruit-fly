@@ -131,7 +131,8 @@ class CocoaHost(Host):
                            f"pyobjc-framework-Cocoa pyobjc-framework-Quartz")
         return True, ""
 
-    def __init__(self, hud: bool = False):
+    def __init__(self, hud: bool = False,
+                 recordable: bool = False):  # noqa: ARG002 - never hides
         if _IMPORT_ERROR is not None:
             raise RuntimeError(self.available()[1])
         self._cairo = cairo

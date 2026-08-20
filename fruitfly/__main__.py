@@ -36,6 +36,10 @@ def main(argv=None):
                     help="background noise rate, Hz (spontaneity)")
     ap.add_argument("--inh", type=float, default=1.5,
                     help="inhibition gain")
+    ap.add_argument("--recordable", action="store_true",
+                    help="let screen recorders see the fly (Windows hides "
+                         "it from capture so it cannot see itself); the "
+                         "fly may then react to its own image")
     ap.add_argument("--seed", type=int, default=None)
     args = ap.parse_args(argv)
 
@@ -65,7 +69,8 @@ def main(argv=None):
     from .app import run  # noqa: PLC0415
     run(noise_rate=args.noise, inh_gain=args.inh, dt=args.dt,
         size=args.size, hud=args.hud, vision=not args.no_vision,
-        pure_retina=args.pure_retina, backend=args.backend, seed=args.seed)
+        pure_retina=args.pure_retina, backend=args.backend, seed=args.seed,
+        recordable=args.recordable)
 
 
 if __name__ == "__main__":
