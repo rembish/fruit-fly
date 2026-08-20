@@ -73,16 +73,26 @@ implements).
 
 ```bash
 sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0 python3-numpy
-python3 -m fruitfly            # downloads + compiles the brain on first run
-```
-
-**macOS** (Homebrew):
-
-```bash
-brew install cairo             # pycairo needs it to build
-pip3 install pyobjc-framework-Cocoa pyobjc-framework-Quartz pycairo numpy
+# first run downloads and compiles the brain (~50 MB, one time)
 python3 -m fruitfly
 ```
+
+**macOS** (Homebrew). Do not use the `python3` that ships with Xcode: it
+is 3.9, which this project does not support, and pyobjc-core has no 3.9
+wheel — pip falls back to a source build that fails on current clang.
+
+```bash
+brew install python@3.13 cairo pkgconf
+python3.13 -m venv .venv
+source .venv/bin/activate
+pip install pyobjc-framework-Cocoa pyobjc-framework-Quartz pycairo numpy
+python -m fruitfly
+```
+
+`pkgconf` is not optional: pycairo publishes no macOS wheels at all, so it
+always builds from source, and its build finds cairo through pkg-config.
+Installing cairo without it fails with "Dependency lookup for cairo with
+method 'pkg-config' failed".
 
 On first launch macOS will ask for **Screen Recording** permission —
 that is the fly's eyesight (it reads the pixels around itself). Decline
