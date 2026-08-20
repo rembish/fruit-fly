@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "fruitfly"
 version = "0.1.0"
-description = "A desktop fly driven by the real FlyWire Drosophila connectome — 139k neurons buzzing over your desktop (Linux/GTK and macOS/Cocoa)"
+description = "A desktop fly driven by the real FlyWire Drosophila connectome — 139k neurons buzzing over your desktop (Linux, macOS and Windows)"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -40,7 +40,9 @@ dependencies = [
 fruitfly = "fruitfly.__main__:main"
 
 [project.urls]
-Homepage = "https://github.com/rembish/fruit-fly-linux"
+Homepage = "https://github.com/rembish/fruit-fly"
+Repository = "https://github.com/rembish/fruit-fly"
+Issues = "https://github.com/rembish/fruit-fly/issues"
 
 [tool.setuptools]
 packages = ["fruitfly", "fruitfly.ui"]
