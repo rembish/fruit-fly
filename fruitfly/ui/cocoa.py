@@ -1,7 +1,9 @@
 """Cocoa backend — macOS, via PyObjC. No X11, no GTK.
 
-UNTESTED ON HARDWARE: written against the documented AppKit/Quartz APIs
-but developed on Linux. Please report what breaks.
+Developed on Linux against the documented AppKit/Quartz APIs, and since
+run on a Mac, where the fly does appear and fly. Most of it is still
+lightly exercised, so please report what breaks -- the first thing that
+did was Ctrl-C, see stop_event_loop.
 
 Design notes:
   * the fly lives in a borderless, transparent, non-activating NSWindow
@@ -20,6 +22,7 @@ Design notes:
 from __future__ import annotations
 
 import contextlib
+import signal
 from typing import TYPE_CHECKING
 
 import cairo
@@ -40,6 +43,13 @@ try:
 except Exception as _e:                      # pragma: no cover - macOS only
     objc = AppKit = Quartz = AppHelper = None
     _IMPORT_ERROR = _e
+
+
+#: NSEvent constructor for the synthetic event that wakes the run loop.
+#: Kept as a string because the selector is 74 characters and will not
+#: fit the line limit written as an attribute access.
+_WAKE_SELECTOR = ("otherEventWithType_location_modifierFlags_timestamp_"
+                  "windowNumber_context_subtype_data1_data2_")
 
 
 def _cairo_surface_to_cgimage(surface, w, h):
@@ -115,7 +125,12 @@ if AppKit is not None:                       # pragma: no cover - macOS only
 
         def tick_(self, _timer):
             host = getattr(self, "host", None)
-            if host is not None and host.controller is not None:
+            if host is None:
+                return
+            if host.interrupted:          # Ctrl-C arrived; leave the loop
+                host.stop_event_loop()
+                return
+            if host.controller is not None:
                 host.controller.tick()
 
 
@@ -130,6 +145,8 @@ class CocoaHost(Host):
                            f"Install: pip install "
                            f"pyobjc-framework-Cocoa pyobjc-framework-Quartz")
         return True, ""
+
+    interrupted = False
 
     def __init__(self, hud: bool = False,
                  recordable: bool = False):  # noqa: ARG002 - never hides
@@ -277,8 +294,47 @@ class CocoaHost(Host):
                        .scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
                            1.0 / 60.0, ticker, objc.selector(
                                ticker.tick_, signature=b"v@:@"), None, True))
-        with contextlib.suppress(KeyboardInterrupt):
-            AppHelper.runEventLoop(installInterrupt=True)
+        # Handle SIGINT ourselves rather than letting PyObjC install its
+        # own: a Python signal handler cannot run while the process is
+        # blocked in AppKit, so the flag is only seen when the timer next
+        # runs Python — and a KeyboardInterrupt raised there is swallowed
+        # by PyObjC's callback machinery instead of leaving runEventLoop.
+        # Latching a flag the tick checks avoids both problems.
+        self.interrupted = False
+        previous = signal.signal(signal.SIGINT, self._on_interrupt)
+        try:
+            with contextlib.suppress(KeyboardInterrupt):
+                AppHelper.runEventLoop(installInterrupt=False)
+        finally:
+            with contextlib.suppress(Exception):
+                signal.signal(signal.SIGINT, previous)
+
+    def _on_interrupt(self, _signum, _frame) -> None:
+        """Ctrl-C: latch it. The 60Hz tick acts on it a frame later."""
+        self.interrupted = True
+
+    def stop_event_loop(self) -> None:
+        """Leave runEventLoop so app.py can shut the fly down cleanly.
+
+        NSApp.stop_ does not end the loop by itself: it only takes effect
+        once the loop processes another *event*, and timers are not
+        events. This app is non-activating and click-through, so it can
+        run for ever without receiving one -- which is exactly why Ctrl-C
+        looked like it did nothing. Post a dummy event to wake it.
+
+        stop_ rather than terminate_ on purpose: terminate_ would end the
+        process here and skip the brain-thread shutdown in app.py.
+        """
+        app = AppKit.NSApp()
+        if app is None:
+            return
+        app.stop_(None)
+        kind = getattr(AppKit, "NSEventTypeApplicationDefined",
+                       getattr(AppKit, "NSApplicationDefined", 15))
+        with contextlib.suppress(Exception):
+            make = getattr(AppKit.NSEvent, _WAKE_SELECTOR)
+            wake = make(kind, (0.0, 0.0), 0, 0.0, 0, None, 0, 0, 0)
+            app.postEvent_atStart_(wake, True)
 
     def shutdown(self):
         timer = getattr(self, "_timer", None)

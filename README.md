@@ -94,6 +94,10 @@ always builds from source, and its build finds cairo through pkg-config.
 Installing cairo without it fails with "Dependency lookup for cairo with
 method 'pkg-config' failed".
 
+Stop the fly with `Ctrl-C` in the terminal that started it. If it ever
+refuses to die, `pkill -f "fruitfly"` always works: the fly has no menu
+bar and no `Cmd-Q`, because its windows are deliberately non-activating.
+
 On first launch macOS will ask for **Screen Recording** permission —
 that is the fly's eyesight (it reads the pixels around itself). Decline
 and it still flies, just blind; grant it in System Settings → Privacy &
