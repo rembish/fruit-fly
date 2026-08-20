@@ -139,6 +139,39 @@ def test_drawing_surfaces():
     print("cairo surfaces OK (ARGB32, tight stride — CGImage-compatible)")
 
 
+def test_layered_window_pixel_contract():
+    """What Win32's UpdateLayeredWindow and Cocoa's CGImageCreate assume.
+
+    Both take the cairo surface's memory verbatim: premultiplied BGRA on
+    little-endian. This is checkable anywhere, so the riskiest part of
+    those two (untested) backends is pinned down here.
+    """
+    import ctypes
+    import sys
+
+    assert sys.byteorder == "little", (
+        "backends assume little-endian ARGB32 == BGRA bytes")
+    w = h = 8
+    buf = (ctypes.c_char * (w * h * 4))()     # stands in for the Win32 DIB
+    surf = cairo.ImageSurface.create_for_data(
+        memoryview(buf), cairo.FORMAT_ARGB32, w, h, w * 4)
+    cr = cairo.Context(surf)
+    cr.set_operator(cairo.OPERATOR_SOURCE)
+    cr.set_source_rgba(0, 0, 0, 0)
+    cr.paint()
+    cr.set_operator(cairo.OPERATOR_OVER)
+    cr.set_source_rgba(1.0, 0.0, 0.0, 0.5)    # half-transparent red
+    cr.rectangle(0, 0, w, h)
+    cr.fill()
+    surf.flush()
+
+    b, g, r, a = np.frombuffer(bytes(buf), dtype=np.uint8).reshape(
+        h, w, 4)[0, 0].tolist()
+    assert (b, g) == (0, 0) and a == 128, f"unexpected layout {(b, g, r, a)}"
+    assert r == 128, f"not premultiplied (expected 128, got {r})"
+    print("layered-window pixel contract OK (premultiplied BGRA, zero-copy)")
+
+
 def test_swat_semantics():
     _host, ctl = build()
     ctl.motor.st.state = LANDED
@@ -170,6 +203,7 @@ if __name__ == "__main__":
     test_grab_bounds_at_screen_edges()
     test_blind_host_survives()
     test_drawing_surfaces()
+    test_layered_window_pixel_contract()
     test_swat_semantics()
     test_hit_radius()
     print("\nALL BACKEND CONTRACT TESTS PASSED")

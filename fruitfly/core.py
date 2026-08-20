@@ -187,8 +187,9 @@ class Controller:
                 if not self._vision_warned:
                     self._vision_warned = True
                     print("[fly] screen capture unavailable — the fly is "
-                          "blind (its brain still runs). See README for "
-                          "the Screen Recording permission.", flush=True)
+                          "blind (its brain still runs). On macOS grant "
+                          "Screen Recording permission; see README.",
+                          flush=True)
                 continue
             setattr(self.frame, attr, patch)
         now = time.perf_counter()

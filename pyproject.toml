@@ -14,17 +14,20 @@ keywords = ["connectome", "drosophila", "flywire", "desktop-pet", "neuroscience"
 classifiers = [
     "Environment :: X11 Applications :: GTK",
     "Environment :: MacOS X :: Cocoa",
+    "Environment :: Win32 (MS Windows)",
     "Operating System :: POSIX :: Linux",
     "Operating System :: MacOS :: MacOS X",
+    "Operating System :: Microsoft :: Windows",
     "Programming Language :: Python :: 3",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
     "Topic :: Desktop Environment",
 ]
 
-# numpy and pycairo are needed everywhere (the sprite is drawn with cairo
-# on both backends). PyGObject is Linux-only and is best installed from
-# your distribution (python3-gi, python3-gi-cairo, gir1.2-gtk-3.0);
-# building it via pip needs GTK C headers. macOS pulls PyObjC instead.
+# numpy and pycairo are needed everywhere (every backend draws the sprite
+# with cairo). PyGObject is Linux-only and is best installed from your
+# distribution (python3-gi, python3-gi-cairo, gir1.2-gtk-3.0); building it
+# via pip needs GTK C headers. macOS pulls PyObjC; Windows needs nothing
+# extra — its backend is pure ctypes.
 dependencies = [
     "numpy>=1.24",
     "pycairo>=1.20",

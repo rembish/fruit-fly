@@ -60,6 +60,7 @@ implements).
 |---|---|---|
 | Linux (X11, or Wayland via XWayland) | `gtk` | GTK3 + PyGObject, a compositing WM |
 | macOS 10.15+ | `cocoa` | PyObjC, Screen Recording permission for vision |
+| Windows 10/11 | `win32` | nothing extra (pure `ctypes`) |
 
 **Linux** (Debian/Ubuntu/Mint):
 
@@ -82,7 +83,21 @@ and it still flies, just blind; grant it in System Settings → Privacy &
 Security → Screen Recording and restart. No Accessibility permission is
 needed: swat detection uses the window's own hit-testing.
 
-Or install the package on either platform:
+**Windows** (PowerShell, Python from python.org):
+
+```powershell
+pip install numpy pycairo
+python -m fruitfly
+```
+
+No extra dependency and no permission prompt: the window layer is pure
+`ctypes` against Win32. The fly is a layered window, so clicks land only
+on the fly itself and pass through everywhere else automatically —
+Windows hit-tests layered windows per-pixel by alpha. On Windows 10
+2004+ the fly is also excluded from screen capture, so it can't see
+itself in its own retina.
+
+Or install the package on any platform:
 
 ```bash
 python3 -m venv --system-site-packages .venv && . .venv/bin/activate
@@ -99,7 +114,7 @@ fruitfly --pure-retina  no looming injection: escapes only via the real eyes
 fruitfly --no-vision    don't sample the screen into the retina
 fruitfly --noise 140    more spontaneous brain activity (a more annoying fly)
 fruitfly --dt 1.0       finer integration (slower; default 2.0 ms)
-fruitfly --backend gtk  force a window backend (gtk, cocoa); default: auto
+fruitfly --backend gtk  force a backend (gtk, cocoa, win32); default: auto
 fruitfly test           headless 30 s behavioral test, no window
 ```
 
@@ -195,6 +210,7 @@ fruitfly/core.py     platform-independent controller + brain thread
 fruitfly/ui/base.py  the Host interface a window backend implements
 fruitfly/ui/gtk.py   Linux/X11 backend
 fruitfly/ui/cocoa.py macOS backend
+fruitfly/ui/win32.py Windows backend (ctypes, no dependency)
 fruitfly/app.py      wires brain + senses + backend together
 tests/               circuit, retina, closed-loop and backend-contract tests
 ```

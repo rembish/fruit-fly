@@ -15,13 +15,15 @@ from .base import Host
 REGISTRY = {
     "gtk": ("fruitfly.ui.gtk", "GtkHost"),
     "cocoa": ("fruitfly.ui.cocoa", "CocoaHost"),
+    "win32": ("fruitfly.ui.win32", "Win32Host"),
 }
 
 #: preference order per platform, most native first
 PLATFORM_ORDER = {
     "linux": ["gtk"],
     "darwin": ["cocoa", "gtk"],   # GTK/quartz works if someone insists
-    "win32": [],
+    "win32": ["win32", "gtk"],    # GTK via MSYS2 as a fallback
+    "cygwin": ["win32", "gtk"],
 }
 
 
@@ -48,8 +50,9 @@ def create_host(hud: bool = False, backend: str | None = None) -> Host:
     order = PLATFORM_ORDER.get(sys.platform, [])
     if not order:
         raise RuntimeError(
-            f"no backend for platform {sys.platform!r}. Supported: "
-            f"Linux (GTK3/X11) and macOS (Cocoa). Contributions welcome.")
+            f"no backend for platform {sys.platform!r}. Supported: Linux "
+            f"(GTK3/X11), macOS (Cocoa), Windows. Contributions welcome — "
+            f"see fruitfly/ui/base.py for the interface.")
 
     problems = []
     for name in order:
