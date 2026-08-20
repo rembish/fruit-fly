@@ -1,5 +1,7 @@
 # fruit-fly 🪰
 
+[![checks](https://github.com/rembish/fruit-fly/actions/workflows/checks.yml/badge.svg)](https://github.com/rembish/fruit-fly/actions/workflows/checks.yml)
+
 A fly that lives on your desktop — Linux, macOS or Windows — driven by the
 **complete real brain of a fruit fly**: the [FlyWire](https://flywire.ai/)
 connectome of adult *Drosophila melanogaster*, 139,255 neurons and ~34
