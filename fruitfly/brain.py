@@ -137,6 +137,18 @@ class Brain:
         if pop in self.pops and len(self.pops[pop]):
             self.vth[self.pops[pop]] += delta_mv
 
+    def reset_state(self) -> None:
+        """Fresh dynamical state (same anatomy): a new fly's brain."""
+        self.v[:] = self.p.v_rest
+        self.s[:] = 0.0
+        self.a[:] = 0.0
+        self.refract[:] = 0
+        self.ring[:] = 0.0
+        self.noise_rate = self.noise_base
+        self._rate_ema = 0.0
+        self._stim_idx = np.empty(0, dtype=np.int32)
+        self._stim_p = np.empty(0, dtype=np.float32)
+
     # ---------------------------------------------------------------- stim
     def set_stimulus(self, stim: dict[str, float] | list):
         """Set forced firing rates for sensory neurons.

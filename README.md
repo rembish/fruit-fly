@@ -85,10 +85,23 @@ fruitfly test           headless 30 s behavioral test, no window
 
 Only a ~150 px transparent window travels with the fly — the rest of your
 screen has no window over it, and within that window only the fly's body
-accepts clicks. **Clicking the fly is a swat attempt**: the touch is fed
-into its real mechanosensory JO (Johnston's organ) neurons — the same
-pathway that drives the giant fiber in a living fly — and it escapes with
-a realistic ~200 ms reaction time. Good luck. The HUD counts your misses.
+accepts clicks. **Clicking the fly is a swat attempt, and the fly is
+mortal**:
+
+- hit it **in the air** and it takes a glancing blow — the touch fires
+  its real mechanosensory JO (Johnston's organ) neurons, the same pathway
+  that drives the giant fiber in a living fly, and it tumbles away
+  (*swats dodged +1*)
+- catch it **on the ground** and it's a SPLAT (*flies swatted +1*). Your
+  approaching cursor looms on its retina and fires its escape circuit at
+  ~110 px — but like a real fly, it then needs **100–220 ms to actually
+  get airborne** (wings up, feet still down, buzzing in place). That
+  startle window is your chance, and it is the entire reason flyswatters
+  work on real flies too. Strike *through* where it sits, don't stalk it.
+  A few seconds after the splat, another fly gets in through the window
+  (fresh brain state, same connectome).
+
+The HUD keeps score.
 
 Quit with Ctrl-C in the terminal. Requires a compositing window manager
 for transparency (MATE: System → Preferences → Windows → enable

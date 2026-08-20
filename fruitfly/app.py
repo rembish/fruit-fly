@@ -29,8 +29,8 @@ import numpy as np  # noqa: E402
 
 from .brain import Brain, RateMonitor
 from .senses import Senses, SensoryFrame, Retina, PATCH, EYE_RADIUS
-from .motor import MotorMap, FLYING, ESCAPE
-from .sprite import draw_fly
+from .motor import MotorMap, FLYING, LANDED, ESCAPE, SQUASHED, TAKEOFF
+from .sprite import draw_fly, draw_splat
 
 MOTOR_POPS = ["GF", "DNa02_L", "DNa02_R", "DNp09", "MDN", "descending",
               "LC4_L", "LC4_R"]
@@ -50,6 +50,7 @@ class Shared:
         self.gf_count = 0
         self.sim_speed = 0.0
         self.spikes_per_s = 0.0
+        self.reset = False
         self.stop = False
 
 
@@ -73,6 +74,10 @@ class BrainThread(threading.Thread):
             t0 = time.perf_counter()
             with self.shared.lock:
                 stim = list(self.shared.stim)
+                do_reset = self.shared.reset
+                self.shared.reset = False
+            if do_reset:
+                b.reset_state()
             b.set_stimulus(stim)
 
             gf_fired = 0
@@ -143,7 +148,7 @@ class HudWindow:
         lines = [
             f"sim {speed:4.2f}x real time   {sps/1000:6.1f}k spikes/s",
             f"threat {o._threat:4.2f}   state {o.motor.st.state}   "
-            f"swats dodged {o.swats_dodged}",
+            f"dodged {o.swats_dodged}   swatted {o.flies_swatted}",
             "  ".join(f"{k} {rates.get(k, 0):5.1f}Hz"
                       for k in ("GF", "DNa02_L", "DNa02_R", "descending")),
             "  ".join(f"{k} {rates.get(k, 0):5.1f}Hz"
@@ -200,6 +205,7 @@ class FlyWindow(Gtk.Window):
         self._bearing = 0.0
         self._swat_until = 0.0
         self.swats_dodged = 0
+        self.flies_swatted = 0
         self._last_tick = time.perf_counter()
         self._lum_tick = 0
         self._last_patch_t = time.perf_counter()
@@ -225,13 +231,29 @@ class FlyWindow(Gtk.Window):
 
     # -------------------------------------------------------------- swat
     def on_swat(self, _w, _event):
-        # a click landed on the fly: felt as touch through its real
-        # mechanosensory JO neurons; the brain decides what happens next
-        self._swat_until = time.perf_counter() - self._t0 + SWAT_S
-        self.swats_dodged += 1
-        if self.verbose:
-            print(f"[fly] SWAT! (attempt #{self.swats_dodged}) — "
-                  f"JO mechanosensors firing", flush=True)
+        t = time.perf_counter() - self._t0
+        st = self.motor.st
+        if st.state == SQUASHED:
+            return True
+        if st.state in (LANDED, TAKEOFF):
+            # caught on the ground — sitting, or mid-startle with its
+            # wings up but feet still down (the flyswatter window)
+            self.flies_swatted += 1
+            self.motor.squash(t)
+            with self.shared.lock:
+                self.shared.reset = True  # this brain is done
+            if self.verbose:
+                print(f"[fly] SPLAT. flies swatted: {self.flies_swatted}, "
+                      f"swats dodged: {self.swats_dodged} — a new fly "
+                      f"arrives shortly", flush=True)
+        else:
+            # airborne: a glancing blow, felt through the JO mechanosensors
+            self.swats_dodged += 1
+            self._swat_until = t + SWAT_S
+            self.motor.glancing_blow(t)
+            if self.verbose:
+                print(f"[fly] swat dodged (#{self.swats_dodged}) — "
+                      f"JO mechanosensors firing", flush=True)
         return True
 
     # ------------------------------------------------------------ senses
@@ -312,10 +334,13 @@ class FlyWindow(Gtk.Window):
         cr.set_operator(cairo.OPERATOR_OVER)
 
         st = self.motor.st
-        draw_fly(cr, WIN / 2, WIN / 2, st.heading, self.size,
-                 flying=st.state in (FLYING, ESCAPE),
-                 wing_phase=st.wing_phase,
-                 escaping=st.state == ESCAPE)
+        if st.state == SQUASHED:
+            draw_splat(cr, WIN / 2, WIN / 2, st.heading, self.size)
+        else:
+            draw_fly(cr, WIN / 2, WIN / 2, st.heading, self.size,
+                     flying=st.state in (FLYING, ESCAPE, TAKEOFF),
+                     wing_phase=st.wing_phase,
+                     escaping=st.state in (ESCAPE, TAKEOFF))
         return False
 
     def shutdown(self):

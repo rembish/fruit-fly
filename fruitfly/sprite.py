@@ -104,6 +104,38 @@ def draw_fly(cr, x: float, y: float, heading: float, size: float,
     cr.restore()
 
 
+def draw_splat(cr, x: float, y: float, heading: float, size: float) -> None:
+    """The remains. Deterministic irregular blob + detached wings."""
+    cr.save()
+    cr.translate(x, y)
+    cr.rotate(heading)
+    s = size / 34.0
+
+    cr.set_source_rgba(0.13, 0.09, 0.05, 0.85)
+    lobes = [(0, 0, 9), (8, 4, 5), (-7, 5, 6), (5, -7, 5), (-5, -6, 4),
+             (11, -2, 3.5), (-10, -1, 4), (2, 9, 4), (-2, -10, 3)]
+    for lx, ly, r in lobes:
+        _ellipse(cr, lx * s, ly * s, r * s, r * 0.85 * s)
+        cr.fill()
+    # spatter dots
+    cr.set_source_rgba(0.13, 0.09, 0.05, 0.65)
+    for dx, dy, r in [(16, 6, 1.6), (-15, 8, 1.3), (14, -10, 1.2),
+                      (-13, -9, 1.5), (19, -3, 1.0), (-18, 2, 1.1)]:
+        _ellipse(cr, dx * s, dy * s, r * s, r * s)
+        cr.fill()
+    # detached wings
+    cr.set_source_rgba(WING[0], WING[1], WING[2], 0.55)
+    for wx, wy, ang in [(10, 8, 0.6), (-8, -11, -2.2)]:
+        cr.save()
+        cr.translate(wx * s, wy * s)
+        cr.rotate(ang)
+        cr.scale(1.0, 0.4)
+        _ellipse(cr, 0, 0, 8 * s, 4 * s)
+        cr.fill()
+        cr.restore()
+    cr.restore()
+
+
 def _ellipse(cr, cx, cy, rx, ry):
     cr.save()
     cr.translate(cx, cy)

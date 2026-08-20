@@ -39,7 +39,8 @@ def main():
 
     tick = 1 / 30.0  # motor updates at 30 fps equivalent
     steps_per_tick = int(tick * 1000 / brain.dt)
-    events, states = [], {"flying": 0.0, "landed": 0.0, "escape": 0.0}
+    events, states = [], {"flying": 0.0, "landed": 0.0, "escape": 0.0,
+                          "takeoff": 0.0, "squashed": 0.0}
     gf_total = 0
     wall0 = time.perf_counter()
 
