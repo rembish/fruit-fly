@@ -41,9 +41,10 @@ try:
     # other platforms cannot see them
     user32 = ctypes.WinDLL("user32", use_last_error=True)  # type: ignore[attr-defined]
     gdi32 = ctypes.WinDLL("gdi32", use_last_error=True)  # type: ignore[attr-defined]
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)  # type: ignore[attr-defined]
     _IMPORT_ERROR: Exception | None = None
 except Exception as _e:                    # non-Windows, or no ctypes.WinDLL
-    wintypes = user32 = gdi32 = None  # type: ignore[assignment]
+    wintypes = user32 = gdi32 = kernel32 = None  # type: ignore[assignment]
     _IMPORT_ERROR = _e
 
 
@@ -129,12 +130,78 @@ if _IMPORT_ERROR is None:                  # pragma: no cover - Windows only
         _fields_ = [("bmiHeader", BITMAPINFOHEADER),
                     ("bmiColors", wintypes.DWORD * 3)]
 
-    user32.CreateWindowExW.restype = wintypes.HWND
-    user32.DefWindowProcW.restype = LRESULT
-    user32.GetDC.restype = wintypes.HDC
-    gdi32.CreateCompatibleDC.restype = wintypes.HDC
-    gdi32.CreateDIBSection.restype = wintypes.HBITMAP
-    gdi32.SelectObject.restype = wintypes.HGDIOBJ
+    # An undeclared ctypes argument is marshalled as a 32-bit C int, so
+    # every pointer-sized value breaks on Win64. The first WM_NCCREATE
+    # hands the wndproc an LPARAM holding a CREATESTRUCT address;
+    # DefWindowProcW then raises OverflowError, ctypes swallows it and
+    # returns 0 from the callback, WM_NCCREATE reads that as "abort", and
+    # CreateWindowExW returns NULL with GetLastError() == 0 — i.e. the
+    # fly dies on "[WinError 0] The operation completed successfully".
+    # DWORD-range flags happen to survive undeclared; handles and
+    # pointers do not. Declaring every signature makes the difference
+    # stop mattering — keep new API calls declared here too, and
+    # test_win32_signatures_declared enforces exactly that.
+    LPMSG = ctypes.POINTER(MSG)
+    LPPOINT = ctypes.POINTER(POINT)
+
+    def _declare(lib, name, restype, *argtypes) -> None:
+        """Pin one API's signature; skip exports this Windows lacks."""
+        fn = getattr(lib, name, None)
+        if fn is None:            # older Windows; the call site suppresses
+            return
+        fn.restype = restype
+        fn.argtypes = list(argtypes)
+
+    _declare(user32, "CreateWindowExW", wintypes.HWND,
+             wintypes.DWORD, wintypes.LPCWSTR, wintypes.LPCWSTR,
+             wintypes.DWORD, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+             ctypes.c_int, wintypes.HWND, wintypes.HMENU,
+             wintypes.HINSTANCE, wintypes.LPVOID)
+    _declare(user32, "DefWindowProcW", LRESULT, wintypes.HWND,
+             wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM)
+    _declare(user32, "DestroyWindow", wintypes.BOOL, wintypes.HWND)
+    _declare(user32, "DispatchMessageW", LRESULT, LPMSG)
+    _declare(user32, "GetCursorPos", wintypes.BOOL, LPPOINT)
+    _declare(user32, "GetDC", wintypes.HDC, wintypes.HWND)
+    _declare(user32, "GetSystemMetrics", ctypes.c_int, ctypes.c_int)
+    _declare(user32, "PeekMessageW", wintypes.BOOL, LPMSG, wintypes.HWND,
+             wintypes.UINT, wintypes.UINT, wintypes.UINT)
+    _declare(user32, "RegisterClassW", wintypes.ATOM,
+             ctypes.POINTER(WNDCLASSW))
+    _declare(user32, "ReleaseDC", ctypes.c_int, wintypes.HWND,
+             wintypes.HDC)
+    _declare(user32, "SetProcessDPIAware", wintypes.BOOL)
+    # Windows 10 1703+ only; absent elsewhere, hence the getattr guard
+    _declare(user32, "SetProcessDpiAwarenessContext", wintypes.BOOL,
+             wintypes.HANDLE)
+    _declare(user32, "SetWindowDisplayAffinity", wintypes.BOOL,
+             wintypes.HWND, wintypes.DWORD)
+    _declare(user32, "ShowWindow", wintypes.BOOL, wintypes.HWND,
+             ctypes.c_int)
+    _declare(user32, "TranslateMessage", wintypes.BOOL, LPMSG)
+    _declare(user32, "UpdateLayeredWindow", wintypes.BOOL, wintypes.HWND,
+             wintypes.HDC, LPPOINT, ctypes.POINTER(SIZE), wintypes.HDC,
+             LPPOINT, wintypes.COLORREF,
+             ctypes.POINTER(BLENDFUNCTION), wintypes.DWORD)
+
+    _declare(gdi32, "CreateCompatibleDC", wintypes.HDC, wintypes.HDC)
+    _declare(gdi32, "CreateDIBSection", wintypes.HBITMAP, wintypes.HDC,
+             ctypes.POINTER(BITMAPINFO), wintypes.UINT,
+             ctypes.POINTER(ctypes.c_void_p), wintypes.HANDLE,
+             wintypes.DWORD)
+    _declare(gdi32, "DeleteDC", wintypes.BOOL, wintypes.HDC)
+    _declare(gdi32, "DeleteObject", wintypes.BOOL, wintypes.HGDIOBJ)
+    _declare(gdi32, "SelectObject", wintypes.HGDIOBJ, wintypes.HDC,
+             wintypes.HGDIOBJ)
+    _declare(gdi32, "SetStretchBltMode", ctypes.c_int, wintypes.HDC,
+             ctypes.c_int)
+    _declare(gdi32, "StretchBlt", wintypes.BOOL, wintypes.HDC,
+             ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+             wintypes.HDC, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+             ctypes.c_int, wintypes.DWORD)
+
+    _declare(kernel32, "GetModuleHandleW", wintypes.HMODULE,
+             wintypes.LPCWSTR)
 
 
 def _top_down_dib(hdc, w, h):
@@ -234,7 +301,7 @@ class Win32Host(Host):
         self._capture: tuple | None = None
 
         self._set_dpi_aware()
-        self.hinstance = ctypes.windll.kernel32.GetModuleHandleW(None)  # type: ignore[attr-defined]
+        self.hinstance = kernel32.GetModuleHandleW(None)
         self.class_name = "FruitflyWindow"
         self._wndproc = WNDPROC(self._on_message)   # keep alive!
         wc = WNDCLASSW()

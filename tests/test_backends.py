@@ -10,6 +10,8 @@ Run:  python3 tests/test_backends.py
 
 import ctypes
 import os
+import pathlib
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -210,6 +212,27 @@ def test_swat_semantics():
     print("swat semantics OK (ground=kill, air=dodge, takeoff=kill)")
 
 
+def test_win32_signatures_declared():
+    """Every Win32 API the backend calls must have declared argtypes.
+
+    ctypes marshals an undeclared argument as a 32-bit C int, so an
+    undeclared call takes a pointer-sized handle or LPARAM and dies on
+    Win64 only — invisible from every other platform, and fatal on the
+    one that matters. This is a source scan, so it catches a missing
+    declaration wherever the tests happen to run.
+    """
+    src = pathlib.Path(__file__).resolve().parent.parent / "fruitfly"
+    text = (src / "ui" / "win32.py").read_text()
+    called = set(re.findall(r"\b(?:user32|gdi32|kernel32)\.([A-Za-z]\w*)",
+                            text))
+    declared = set(re.findall(r'_declare\(\w+, "(\w+)"', text))
+    missing = sorted(called - declared)
+    assert not missing, (
+        f"Win32 calls without declared argtypes: {', '.join(missing)}. "
+        f"Add a _declare(...) for each in fruitfly/ui/win32.py.")
+    print(f"{len(called)} Win32 APIs called, all with declared signatures")
+
+
 def test_hit_radius():
     _host, ctl = build()
     r = ctl.hit_radius()
@@ -226,5 +249,6 @@ if __name__ == "__main__":
     test_drawing_surfaces()
     test_layered_window_pixel_contract()
     test_swat_semantics()
+    test_win32_signatures_declared()
     test_hit_radius()
     print("\nALL BACKEND CONTRACT TESTS PASSED")
