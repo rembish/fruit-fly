@@ -117,11 +117,16 @@ class Brain:
         self.ring = np.zeros((self.delay_steps, self.n), dtype=np.float32)
         self.ring_pos = 0
 
-        # background noise (spontaneity): Poisson synaptic bombardment.
-        # noise_rate is regulated by a slow homeostat toward target_rate —
-        # think of it as neuromodulatory arousal: when the brain has been
-        # quiet it slowly builds, when the brain rages it backs off. All
-        # actual computation still runs through the real synapses.
+        # background noise (spontaneity): Poisson synaptic bombardment,
+        # regulated by a slow homeostat toward target_rate. Call it what
+        # it is: a stability governor on an invented noise floor, not
+        # "arousal". It raises the floor when the network goes quiet and
+        # backs off when it rages, which is what keeps the network out of
+        # the coma/seizure pair it otherwise collapses into. Real arousal
+        # is neuromodulatory and largely octopaminergic, and this is not
+        # that — octopamine multiplies drive that already exists, so it
+        # could never do this job: multiplying a silent network keeps it
+        # silent. All actual computation still runs through real synapses.
         # Noise goes only to the central brain by default: the optic lobes
         # (~100k of the 139k neurons) are driven by actual visual input, and
         # noise there makes the fly hallucinate looming objects.
@@ -261,7 +266,7 @@ class Brain:
             self._propagate(spiked)
             self.total_spikes += len(spiked)
 
-        # arousal homeostat: nudge noise toward the target network rate
+        # noise-floor governor: nudge the floor toward the target rate
         inst = len(spiked) * 1000.0 / (self.n * dt)      # Hz/neuron this step
         self._rate_ema += (inst - self._rate_ema) * (dt / 500.0)
         if self.noise_base > 0.0:

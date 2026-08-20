@@ -199,10 +199,26 @@ What is added or approximated, and why:
   intrinsic noise and neuromodulation; ours is the source of all
   spontaneous behavior, but every "decision" still propagates through the
   real synapses.
-- **Spike-frequency adaptation + slow arousal homeostat**: without them
+- **Monoamines as fast excitation**: dopamine, serotonin and octopamine
+  are modelled as ordinary excitatory synapses, like every other
+  excitatory connection. They are not: they act through GPCRs with slow,
+  multiplicative effects on gain and state, and serotonin's effect is
+  broadly opposite to octopamine's. This is 1.97% of the connectome by
+  synapse weight (octopamine alone 0.28%), and it is inherited rather
+  than invented — Shiu et al. make the same simplification — but it was
+  missing from this list, which is why it is here now.
+- **Spike-frequency adaptation + slow noise-floor governor**: without them
   the model has only two states, coma and seizure (the paper only ever
   stimulates it for fractions of a second from silence). Adaptation is
-  biologically standard and gives the network self-quenching bursts.
+  biologically standard and gives the network self-quenching bursts. The
+  governor is not: it is a controller that raises the invented noise
+  floor when the network falls quiet and backs it off when the network
+  rages. It is tempting to call that arousal, and this project used to,
+  but real arousal is neuromodulatory and could not do this job —
+  octopamine multiplies drive that already exists, and multiplying a
+  silent network leaves it silent. The governor sets a floor; a
+  neuromodulator sets a gain. Only the floor keeps coma from being an
+  absorbing state.
 - **Exponential synapses, dt = 2 ms** instead of alpha synapses at 0.1 ms:
   calibrated to the same single-synapse PSP peak (0.275 mV). The decay
   factors are exact, `exp(-dt/tau)`, so dt costs spike-timing resolution

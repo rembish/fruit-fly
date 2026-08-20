@@ -15,8 +15,8 @@ which is why smaller dt costs so much and buys so little.
 
 Measuring the two separately matters. The obvious approach — run each
 candidate dt for a moment and time it — is measuring a transient:
-adaptation equilibrates over tau_adapt = 500 ms and the arousal homeostat
-has a 500 ms EMA on top, so a short burst samples an arbitrary point of
+adaptation equilibrates over tau_adapt = 500 ms and the noise-floor
+governor has a 500 ms EMA on top, so a short burst samples an arbitrary point of
 each candidate's own ramp-up, and the candidates are not comparable to
 each other. D is measured on a silenced brain where there is no transient
 to be caught by, and the firing rate is measured once, warm.
@@ -95,7 +95,7 @@ def warm_rate(indptr, indices, weights, pops, *, dt: float = 2.0,
     """Steady-state firing rate and per-step cost, measured once, warm.
 
     Returns (hz_per_neuron, us_per_step). Runs long enough to get past
-    adaptation and the arousal homeostat rather than sampling their ramp.
+    adaptation and the noise-floor governor rather than sampling the ramp.
     """
     b = Brain(indptr, indices, weights, pops, dt=dt, noise_rate=noise_rate,
               noise_weight=noise_weight, inh_gain=inh_gain, seed=seed)
