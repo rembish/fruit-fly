@@ -231,11 +231,21 @@ What is added or approximated, and why:
   why `--dt auto` will not choose it for you.
 - **A higher giant-fiber threshold and rate-based motor readout**: the real
   GF is a huge neuron famous for its high threshold; and real motor
-  circuits threshold their drive — the wing motor neurons live in the
-  ventral nerve cord, which is a separate connectome not included here.
-  The final translation of descending-neuron rates into 2D screen motion
-  is ours, and is the least principled part of the project. It is also
-  the part that makes it a desktop toy instead of a paper.
+  circuits threshold their drive — but the wing motor neurons live in the
+  ventral nerve cord, and this connectome stops at the neck. The final
+  translation of descending-neuron rates into 2D screen motion is ours,
+  and is the least principled part of the project. It is also the part
+  that makes it a desktop toy instead of a paper.
+
+  This one is deliberate, not pending. The nerve cord *is* public — the
+  MANC connectome is 23,188 traced neurons including 379 wing and leg
+  motor neurons, downloadable as 76 MB of CSV, and the descending neurons
+  this project reads (DNa01, DNa02, DNp01, DNp09) match it by name, so
+  the bridge would work. But MANC is a male nerve cord and FlyWire is a
+  female brain. Wiring one to the other would buy a real motor readout at
+  the cost of the sentence this whole project rests on: that you are
+  watching one animal's brain. A chimera of two flies is not the complete
+  real brain of a fruit fly. The invented motor map stays.
 
 ## Layout
 
