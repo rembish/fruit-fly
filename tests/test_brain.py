@@ -122,6 +122,12 @@ def test_psp_calibration_converges_to_analytic():
           f"({100*err[2]:.2f}% at dt=0.01)")
 
 
+def test_brain_smoke():
+    """The full smoke run. Needs the compiled connectome; conftest skips
+    it when there is none, and marks it slow either way."""
+    main()
+
+
 if __name__ == "__main__":
     test_decays_are_exact_not_euler()
     test_psp_calibration_converges_to_analytic()

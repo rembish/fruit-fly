@@ -90,6 +90,11 @@ def main(dt=2.0):
     return 0 if ok else 1
 
 
+def test_closed_loop_behaviour():
+    """30 simulated seconds of desktop life at the tuned timestep."""
+    assert main() == 0, "the fly failed to both fly and land, or to escape"
+
+
 if __name__ == "__main__":
     # optional dt argument: the timesteps bench.DT_MENU offers must each
     # be run through this before auto-select is allowed to pick them

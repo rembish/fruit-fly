@@ -106,5 +106,10 @@ def main():
     return 0 if ok else 1
 
 
+def test_retina_and_looming():
+    """Retinotopy, and whether a looming cursor reaches the giant fiber."""
+    assert main() == 0
+
+
 if __name__ == "__main__":
     sys.exit(main())

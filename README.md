@@ -318,13 +318,19 @@ What is added or approximated, and why:
 
 ```bash
 pip install -e ".[dev]"
-pytest                             # the fast checks, ~3 s, no brain needed
+pytest                    # everything, ~50 s
+pytest -m "not slow"      # just the fast checks, ~3 s
 ```
 
-`pytest` collects what runs anywhere in seconds. Three suites are
-deliberately *not* collected: they need the compiled connectome, take
-tens of seconds, and are written to be read as much as run, so they are
-plain scripts.
+One command runs all of it. Three suites drive the whole simulation for
+tens of seconds each, so they carry a `slow` marker you can deselect;
+anything needing `data/brain.npz` is skipped with a reason rather than
+failed when there is none, so `pytest` on a fresh clone is green before
+you have downloaded anything.
+
+Those three are also plain scripts, because their output is a narrative
+worth reading rather than a pass/fail — 30 seconds of a fly's life, or a
+retina lighting up:
 
 ```bash
 python3 tests/test_brain.py        # silence at rest, escape circuit, speed
@@ -333,13 +339,12 @@ python3 tests/test_behavior.py 0.5 # ... at a different timestep
 python3 tests/test_retina.py       # retinotopy, and looming through the eyes
 ```
 
-Coverage is **44%** from `pytest` alone and **53%** with the script
-suites as well (`coverage run -a --source=fruitfly tests/test_brain.py`,
-and so on). Most of the remainder is code that cannot run headless on one
-machine: the three window backends, `app.py` and `__main__.py`, which
-exist to wire the fly to a screen, and the fetch/compile half of
-`data.py`. The parts that decide how the fly behaves are where the
-coverage is — `senses` 100%, `brain` 91%, `motor` 87%, `sprite` 86%.
+Coverage is **53%** (`coverage run --source=fruitfly -m pytest`). Most of
+the remainder is code that cannot run headless on one machine: the three
+window backends, `app.py` and `__main__.py`, which exist to wire the fly
+to a screen, and the fetch/compile half of `data.py`. The parts that
+decide how the fly behaves are where the coverage is — `senses` 100%,
+`brain` 91%, `motor` 87%, `sprite` 86%.
 
 ## Layout
 

@@ -62,6 +62,12 @@ version = { attr = "fruitfly.__version__" }
 # connectome are meant to be run. See tests/README or `## Tests` below.
 dev = ["ruff>=0.5", "mypy>=1.8", "pytest>=7", "coverage>=7"]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: drives the whole simulation and needs data/brain.npz",
+]
+
 [tool.ruff]
 line-length = 79
 target-version = "py310"
