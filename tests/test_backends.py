@@ -170,7 +170,9 @@ def test_layered_window_pixel_contract():
 
     Both take the cairo surface's memory verbatim: premultiplied BGRA on
     little-endian. This is checkable anywhere, so the riskiest part of
-    those two barely-exercised backends is pinned down here.
+    those two backends is pinned down here. Both now run on real
+    hardware, but neither is exercised by these tests on Linux, so the
+    part that can be checked anywhere is checked anywhere.
     """
     assert sys.byteorder == "little", (
         "backends assume little-endian ARGB32 == BGRA bytes")

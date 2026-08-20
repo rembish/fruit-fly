@@ -1,9 +1,11 @@
 """Cocoa backend — macOS, via PyObjC. No X11, no GTK.
 
 Developed on Linux against the documented AppKit/Quartz APIs, and since
-run on a Mac, where the fly does appear and fly. Most of it is still
-lightly exercised, so please report what breaks -- the first thing that
-did was Ctrl-C, see stop_event_loop.
+run on a Mac: the fly appears, flies, draws correctly and quits on
+Ctrl-C. Two things here are still unconfirmed on hardware -- whether
+Screen Recording actually feeds the retina, and whether hitTest_ gives
+click-through and swatting. Please report what breaks; the first thing
+that did was Ctrl-C, see stop_event_loop.
 
 Design notes:
   * the fly lives in a borderless, transparent, non-activating NSWindow

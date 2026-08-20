@@ -69,6 +69,16 @@ implements).
 | macOS 10.15+ | `cocoa` | PyObjC, Screen Recording permission for vision |
 | Windows 10/11 | `win32` | nothing extra (pure `ctypes`) |
 
+All three have been run on real hardware. Linux is the one developed
+against day to day; on macOS and Windows the fly is confirmed to appear,
+fly, draw and quit, but the permission-gated vision path and the
+click-through swatting have had little use, so reports are welcome.
+
+Note that WSL is *not* a supported way to run this. WSLg gives X no
+desktop to grab, so the fly is blind there, and its window fights the
+Windows foreground; the app says so at startup and points at the native
+Windows build.
+
 **Linux** (Debian/Ubuntu/Mint):
 
 ```bash
