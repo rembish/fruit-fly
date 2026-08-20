@@ -241,8 +241,17 @@ class Brain:
         # exponential Euler: exact for input held constant over the step,
         # and unconditionally stable, unlike the forward Euler it replaces
         self.a *= self.decay_a
+        # In place rather than as one expression, to keep v explicitly
+        # float32 instead of trusting numpy's scalar-promotion rules not
+        # to widen it -- which is also what lets mypy check this line.
+        # It avoids four 139k-element temporaries per step too, though
+        # that was not measurable above the noise on a loaded machine.
+        # The arithmetic is unchanged: the headless behaviour test gives
+        # a bit-identical 12,432,424 spikes either way.
         v_inf = p.v_rest + self.s - self.a + self.bias
-        self.v = v_inf + (self.v - v_inf) * self.decay_m
+        np.subtract(self.v, v_inf, out=self.v)
+        np.multiply(self.v, self.decay_m, out=self.v)
+        np.add(self.v, v_inf, out=self.v)
         ref = np.flatnonzero(self.refract > 0)
         if len(ref):
             self.v[ref] = p.v_reset

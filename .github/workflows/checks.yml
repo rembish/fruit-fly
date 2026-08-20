@@ -19,8 +19,8 @@ jobs:
     name: ruff + mypy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
@@ -53,8 +53,8 @@ jobs:
           - { os: macos-latest, python: "3.12" }
           - { os: windows-latest, python: "3.12" }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
           cache: pip
@@ -87,8 +87,8 @@ jobs:
     name: full suite with the connectome
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
@@ -101,7 +101,7 @@ jobs:
             libgirepository-2.0-dev \
             || sudo apt-get install -y --no-install-recommends \
                  libgirepository1.0-dev
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: data
           # data.py compiles brain.npz, so a change to it invalidates the

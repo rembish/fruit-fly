@@ -91,7 +91,12 @@ ignore = [
 "tests/*" = ["E402"]          # sys.path setup must precede imports
 
 [tool.mypy]
-python_version = "3.10"
+# Not 3.10, even though that is the floor this project supports: numpy's
+# stubs use PEP 695 `type` statements, which mypy refuses to parse unless
+# it is told to assume 3.12 or newer, and it then checks nothing at all.
+# Pinned rather than left to the running interpreter so a local run and CI
+# agree. That 3.10 still works is proven by the test matrix running on it.
+python_version = "3.12"
 files = ["fruitfly"]
 ignore_missing_imports = true      # gi, objc, AppKit, Quartz, cairo
 warn_unused_ignores = true
