@@ -1,14 +1,15 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "fruitfly"
-version = "0.1.0"
+dynamic = ["version"]
 description = "A desktop fly driven by the real FlyWire Drosophila connectome — 139k neurons buzzing over your desktop (Linux, macOS and Windows)"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "Alex Rembish", email = "alex@rembish.org" }]
 keywords = ["connectome", "drosophila", "flywire", "desktop-pet", "neuroscience", "simulation"]
 classifiers = [
@@ -19,6 +20,10 @@ classifiers = [
     "Operating System :: MacOS :: MacOS X",
     "Operating System :: Microsoft :: Windows",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
     "Topic :: Desktop Environment",
 ]
@@ -46,6 +51,10 @@ Issues = "https://github.com/rembish/fruit-fly/issues"
 
 [tool.setuptools]
 packages = ["fruitfly", "fruitfly.ui"]
+
+# One source of truth for the version: fruitfly/__init__.py
+[tool.setuptools.dynamic]
+version = { attr = "fruitfly.__version__" }
 
 [project.optional-dependencies]
 dev = ["ruff>=0.5", "mypy>=1.8"]

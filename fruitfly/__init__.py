@@ -19,7 +19,7 @@ if sys.version_info < (3, 10):                      # noqa: UP036
         f"Install a current Python (`brew install python@3.13`) and use "
         f"that interpreter, ideally in a venv.")
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 DATA_URL = "https://storage.googleapis.com/flywire-data/codex/data/fafb/783"
 DATA_FILES = [

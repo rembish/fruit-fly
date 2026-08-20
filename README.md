@@ -15,7 +15,7 @@ newspaper. When it takes off, lands, or jinks for no reason at all — a
 neuron decided to.
 
 ![A fruit fly walking and flying across a desktop, over this README, while a
-terminal beside it logs the neurons firing behind each move](docs/demo.gif)
+terminal beside it logs the neurons firing behind each move](https://raw.githubusercontent.com/rembish/fruit-fly/master/docs/demo.gif)
 
 On the right, the fly crosses its own README. On the left, its log: every
 jink, saccade and `ESCAPE!` in that recording is a real neuron reaching
@@ -60,7 +60,7 @@ downloaded on first run, ~50 MB).
 
 The brain, senses, motor and the cairo-drawn sprite are shared; only the
 window layer is per-platform, in `fruitfly/ui/` (see
-[`ui/base.py`](fruitfly/ui/base.py) for the interface a backend
+[`ui/base.py`](https://github.com/rembish/fruit-fly/blob/master/fruitfly/ui/base.py) for the interface a backend
 implements).
 
 | platform | backend | needs |
@@ -113,6 +113,28 @@ that is the fly's eyesight (it reads the pixels around itself). Decline
 and it still flies, just blind; grant it in System Settings → Privacy &
 Security → Screen Recording and restart. No Accessibility permission is
 needed: swat detection uses the window's own hit-testing.
+
+**As a package**, once its dependencies are satisfied:
+
+```bash
+pip install fruitfly
+fruitfly run
+```
+
+That works from a standing start on **Windows only**, where everything
+needed ships a wheel. Everywhere else pip must build `pycairo` from
+source — it publishes wheels for Windows and nowhere else, and PyGObject
+publishes none at all — so the system libraries have to be there first:
+
+| | pycairo wheel | what pip needs first |
+|---|---|---|
+| Windows | yes | nothing |
+| macOS | no | `brew install cairo pkgconf` |
+| Linux | no | distro `python3-gi python3-gi-cairo`, and a venv created with `--system-site-packages` |
+
+On Linux the distro route above is not just the easier path, it is the
+path: installing into a clean venv fails while building pycairo, with
+"Dependency lookup for cairo with method 'pkg-config' failed".
 
 **Windows** (PowerShell, Python from python.org):
 

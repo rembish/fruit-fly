@@ -1,0 +1,6 @@
+# The demo gif is deliberately absent: the README links it by absolute
+# URL so PyPI can render it, and shipping 1.4 MB of animation in every
+# sdist to duplicate that would be silly.
+include LICENSE
+include requirements.txt
+recursive-include tests *.py
