@@ -47,6 +47,18 @@ except Exception as _e:                      # no PyGObject, or no GTK3
     _IMPORT_ERROR = _e
 
 
+def _under_wsl() -> bool:
+    """Are we on WSL? The overlay needs a different shape there."""
+    if os.environ.get("WSL_DISTRO_NAME") or os.environ.get("WSL_INTEROP"):
+        return True
+    with contextlib.suppress(OSError), open("/proc/version") as fh:
+        return "microsoft" in fh.read().lower()
+    return False
+
+
+_UNDER_WSL = _under_wsl()
+
+
 class GtkHost(Host):
     name = "gtk"
     description = "GTK3 on X11 (Linux); needs a compositing window manager"
@@ -84,13 +96,31 @@ class GtkHost(Host):
         self.controller: Controller | None = None
 
     def _layer_window(self, w: int, h: int):
-        win = Gtk.Window(type=Gtk.WindowType.POPUP)
+        if _UNDER_WSL:
+            # WSLg hands every X window to msrdc, which keeps re-activating
+            # it as the Windows foreground window unless it has been told
+            # the window is non-activating. An override-redirect POPUP
+            # carries no WM hints at all, so that never gets said and
+            # typing anywhere else is interrupted continuously — measured
+            # here, focus was stolen back from Windows Terminal 91ms and
+            # 97ms after it was handed over. A managed TOPLEVEL does carry
+            # the hints, and steals nothing.
+            win = Gtk.Window(type=Gtk.WindowType.TOPLEVEL)
+            win.set_decorated(False)
+            win.set_type_hint(Gdk.WindowTypeHint.NOTIFICATION)
+        else:
+            # Elsewhere keep the POPUP. Override-redirect means move() is
+            # exact and immediate at 60Hz, which is what the fly needs and
+            # what no window manager promises. Only switch this after
+            # measuring focus behaviour on the desktop in question.
+            win = Gtk.Window(type=Gtk.WindowType.POPUP)
         win.set_default_size(w, h)
         win.set_app_paintable(True)
         win.set_keep_above(True)
         win.set_skip_taskbar_hint(True)
         win.set_skip_pager_hint(True)
         win.set_accept_focus(False)
+        win.set_focus_on_map(False)
         visual = self.screen.get_rgba_visual()
         if visual is None:
             raise RuntimeError(
