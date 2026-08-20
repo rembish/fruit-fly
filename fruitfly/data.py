@@ -8,15 +8,15 @@ Produces data/brain.npz containing:
 
 from __future__ import annotations
 
+import csv
 import gzip
 import json
 import os
-import sys
 import urllib.request
 
 import numpy as np
 
-from . import DATA_URL, DATA_FILES
+from . import DATA_FILES, DATA_URL
 
 # Neurotransmitter sign convention (Shiu et al. 2024): acetylcholine
 # excitatory; GABA and glutamate inhibitory (GluCl channels in fly);
@@ -71,8 +71,6 @@ def fetch(root: str | None = None) -> None:
 
 def _read_csv_gz(path: str, usecols: list[str]) -> dict[str, np.ndarray]:
     """Minimal streaming CSV reader (files are simple, comma-separated)."""
-    import csv
-
     out: dict[str, list] = {c: [] for c in usecols}
     with gzip.open(path, "rt", newline="") as fh:
         reader = csv.reader(fh)
@@ -104,8 +102,9 @@ def prepare(root: str | None = None, min_synapses: int = 5) -> str:
         ["root_id", "primary_type"],
     )
     ct_map = dict(zip(ct["root_id"].astype(np.int64).tolist(),
-                      ct["primary_type"].tolist()))
-    cls["cell_type"] = np.asarray([ct_map.get(r, "") for r in root_ids.tolist()])
+                      ct["primary_type"].tolist(), strict=True))
+    cls["cell_type"] = np.asarray(
+        [ct_map.get(r, "") for r in root_ids.tolist()])
 
     print("[prepare] reading connections (this is the big one) ...")
     con = _read_csv_gz(
@@ -127,8 +126,7 @@ def prepare(root: str | None = None, min_synapses: int = 5) -> str:
         pos = np.searchsorted(sorted_ids, ids)
         pos = np.clip(pos, 0, n - 1)
         ok = sorted_ids[pos] == ids
-        res = np.where(ok, sorter[pos], -1)
-        return res
+        return np.where(ok, sorter[pos], -1)
 
     pre = to_index(pre_raw)
     post = to_index(post_raw)
@@ -137,13 +135,14 @@ def prepare(root: str | None = None, min_synapses: int = 5) -> str:
 
     # aggregate across neuropils: sum synapses per (pre, post) pair
     print("[prepare] aggregating per neuron pair ...")
-    sign = np.array([NT_SIGN.get(t, +1.0) for t in nt.tolist()], dtype=np.float32)
+    sign = np.array([NT_SIGN.get(t, +1.0) for t in nt.tolist()],
+                    dtype=np.float32)
     # histamine fix: photoreceptor outputs are always inhibitory
     photo_mask = np.isin(cls["cell_type"], list(PHOTORECEPTOR_TYPES))
     flipped = photo_mask[pre] & (sign > 0)
     sign[photo_mask[pre]] = -1.0
     print(f"[prepare] histamine fix: forced {int(flipped.sum())} "
-          f"photoreceptor output connections inhibitory")
+          f"photoreceptor outputs inhibitory")
     signed = syn.astype(np.float32) * sign
     key = pre.astype(np.int64) * n + post.astype(np.int64)
     order = np.argsort(key, kind="stable")
@@ -159,8 +158,8 @@ def prepare(root: str | None = None, min_synapses: int = 5) -> str:
 
     strong = seg_syn >= min_synapses
     upre, upost, w = upre[strong], upost[strong], seg_sum[strong]
-    print(f"[prepare] {strong.sum()} connections with >= {min_synapses} synapses "
-          f"({int(seg_syn[strong].sum())} synapses total)")
+    print(f"[prepare] {strong.sum()} connections with >= {min_synapses} "
+          f"synapses ({int(seg_syn[strong].sum())} synapses total)")
     del key, signed, syn, seg_sum, seg_syn, ukey, ends
 
     # CSR by presynaptic neuron
@@ -174,16 +173,18 @@ def prepare(root: str | None = None, min_synapses: int = 5) -> str:
     pops: dict[str, np.ndarray] = {}
     side = cls["side"]
     for name, col, values in POPULATIONS:
-        if name == "JO":  # Johnston's organ (antennal mechanosensors)
+        if values is None:  # JO: Johnston's organ, matched by prefix
             mask = np.char.startswith(cls["cell_type"].astype(str), "JO-")
         else:
             mask = np.isin(cls[col], list(values))
         for s in ("left", "right"):
             key_name = f"{name}_{s[0].upper()}"
-            pops[key_name] = np.flatnonzero(mask & (side == s)).astype(np.int32)
+            pops[key_name] = np.flatnonzero(
+                mask & (side == s)).astype(np.int32)
         pops[name] = np.flatnonzero(mask).astype(np.int32)
+        n_l, n_r = len(pops[name + "_L"]), len(pops[name + "_R"])
         print(f"[prepare] population {name}: {int(mask.sum())} neurons "
-              f"(L {len(pops[name + '_L'])} / R {len(pops[name + '_R'])})")
+              f"(L {n_l} / R {n_r})")
 
     central = np.isin(cls["super_class"], ["central"])
     pops["central"] = np.flatnonzero(central).astype(np.int32)
@@ -192,15 +193,16 @@ def prepare(root: str | None = None, min_synapses: int = 5) -> str:
     pops["lamina"] = lamina
     print(f"[prepare] population lamina (L1-L5): {len(lamina)} neurons")
 
-    np.savez_compressed(
-        out_path,
-        indptr=indptr,
-        indices=upost.astype(np.int32),
-        weights=w.astype(np.float32),
-        root_ids=root_ids,
-        **{f"pop_{k}": v for k, v in pops.items()},
-        **{f"retina_{k}": v for k, v in retina.items()},
-    )
+    arrays: dict[str, np.ndarray] = {
+        "indptr": indptr,
+        "indices": upost.astype(np.int32),
+        "weights": w.astype(np.float32),
+        "root_ids": root_ids,
+    }
+    arrays.update({f"pop_{k}": v for k, v in pops.items()})
+    arrays.update({f"retina_{k}": v for k, v in retina.items()})
+    # numpy stubs bind **kwargs to allow_pickle here
+    np.savez_compressed(out_path, **arrays)  # type: ignore[arg-type]
     meta = {
         "n_neurons": int(n),
         "n_connections": int(len(upost)),
@@ -210,7 +212,8 @@ def prepare(root: str | None = None, min_synapses: int = 5) -> str:
     }
     with open(os.path.join(d, "meta.json"), "w") as fh:
         json.dump(meta, fh, indent=2)
-    print(f"[prepare] wrote {out_path} ({os.path.getsize(out_path)/1e6:.1f} MB)")
+    size_mb = os.path.getsize(out_path) / 1e6
+    print(f"[prepare] wrote {out_path} ({size_mb:.1f} MB)")
     return out_path
 
 
@@ -241,8 +244,8 @@ def _build_retina(d, cls, to_index, indptr, upost, w):
     t_idx = t_idx[ok]
 
     # per-eye column registries, R7/R8 direct assignments, lamina lookup
-    ph_idx = {"L": [], "R": []}
-    ph_col = {"L": [], "R": []}
+    ph_idx: dict[str, list[int]] = {"L": [], "R": []}
+    ph_col: dict[str, list[int]] = {"L": [], "R": []}
     xy_out = {}
     lam_col: dict[int, tuple[str, int]] = {}   # L1/L2/L3 idx -> (eye, col)
     for eye, letter in (("left", "L"), ("right", "R")):
@@ -250,7 +253,7 @@ def _build_retina(d, cls, to_index, indptr, upost, w):
         cols = np.unique(col_id[m])
         ordinal = {c: i for i, c in enumerate(cols.tolist())}
         cpq = np.zeros((len(cols), 2))
-        for c, i in zip(col_id[m], np.flatnonzero(m)):
+        for c, i in zip(col_id[m], np.flatnonzero(m), strict=True):
             cpq[ordinal[c]] = pq[i]
         # axial hex -> cartesian, normalized to unit disc
         xy = np.stack([cpq[:, 0] + 0.5 * cpq[:, 1],
@@ -292,8 +295,8 @@ def _build_retina(d, cls, to_index, indptr, upost, w):
     # lamina monopolar cells per eye/column (L1/L2/L3): graded neurons whose
     # OFF response is computed in the transduction layer and injected here —
     # the first spiking stage of the visual pathway.
-    lam_idx = {"L": [], "R": []}
-    lam_colo = {"L": [], "R": []}
+    lam_idx: dict[str, list[int]] = {"L": [], "R": []}
+    lam_colo: dict[str, list[int]] = {"L": [], "R": []}
     for idx, (e, c) in lam_col.items():
         lam_idx[e].append(idx)
         lam_colo[e].append(c)

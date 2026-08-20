@@ -23,8 +23,12 @@ Lifecycle:
 from __future__ import annotations
 
 import abc
+from typing import TYPE_CHECKING
 
 import numpy as np
+
+if TYPE_CHECKING:
+    pass
 
 
 class Host(abc.ABC):
@@ -34,6 +38,12 @@ class Host(abc.ABC):
     name: str = "host"
     #: human-readable, for error messages
     description: str = ""
+
+    def __init__(self, hud: bool = False) -> None:  # noqa: B027
+        """Create the fly window, plus the telemetry panel if `hud`.
+
+        Not abstract: a backend needing no setup may inherit this.
+        """
 
     # ------------------------------------------------------- capabilities
     @classmethod
@@ -91,8 +101,8 @@ class Host(abc.ABC):
         Ctrl-C or window close.
         """
 
-    def shutdown(self) -> None:
-        """Optional teardown after `run` returns."""
+    def shutdown(self) -> None:  # noqa: B027 - optional hook, not abstract
+        """Optional teardown after `run` returns; backends may skip it."""
 
 
 # ------------------------------------------------------------- helpers

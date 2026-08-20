@@ -8,6 +8,7 @@ interface and reports its availability instead of crashing.
 Run:  python3 tests/test_backends.py
 """
 
+import ctypes
 import os
 import sys
 
@@ -18,9 +19,9 @@ import numpy as np
 
 from fruitfly import data, ui
 from fruitfly.brain import Brain
-from fruitfly.core import Controller, WIN, HUD_W, HUD_H
-from fruitfly.motor import LANDED, TAKEOFF, SQUASHED
-from fruitfly.senses import Senses, Retina
+from fruitfly.core import HUD_H, HUD_W, WIN, Controller
+from fruitfly.motor import LANDED, SQUASHED, TAKEOFF
+from fruitfly.senses import Retina, Senses
 from fruitfly.ui.base import Host
 
 
@@ -28,7 +29,8 @@ class FakeHost(Host):
     name = "fake"
     description = "headless test double"
 
-    def __init__(self, hud=False, w=1920, h=1200):
+    def __init__(self, hud: bool = False, w=1920, h=1200):
+        self.hud = hud
         self.w, self.h = w, h
         self.controller = None
         self.moves, self.redraws, self.grabs = [], 0, 0
@@ -121,11 +123,10 @@ def test_blind_host_survives():
 def test_drawing_surfaces():
     _host, ctl = build(hud=True)
     ctl.tick()
-    for surf, w, h, fn in (
-            (cairo.ImageSurface(cairo.FORMAT_ARGB32, WIN, WIN),
-             WIN, WIN, "draw"),
+    for surf, w, fn in (
+            (cairo.ImageSurface(cairo.FORMAT_ARGB32, WIN, WIN), WIN, "draw"),
             (cairo.ImageSurface(cairo.FORMAT_ARGB32, HUD_W, HUD_H),
-             HUD_W, HUD_H, "draw_hud")):
+             HUD_W, "draw_hud")):
         getattr(ctl, fn)(cairo.Context(surf))
         surf.flush()
         buf = np.frombuffer(surf.get_data(), dtype=np.uint8)
@@ -146,9 +147,6 @@ def test_layered_window_pixel_contract():
     little-endian. This is checkable anywhere, so the riskiest part of
     those two (untested) backends is pinned down here.
     """
-    import ctypes
-    import sys
-
     assert sys.byteorder == "little", (
         "backends assume little-endian ARGB32 == BGRA bytes")
     w = h = 8

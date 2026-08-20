@@ -283,7 +283,7 @@ class RateMonitor:
             m = np.zeros(brain.n, dtype=bool)
             m[brain.pops[n]] = True
             self.masks[n] = m
-        self.rates = {n: 0.0 for n in self.names}
+        self.rates = dict.fromkeys(self.names, 0.0)
         self.decay = np.exp(-brain.dt / tau_ms)
         self.gain = (1.0 - self.decay) * 1000.0 / brain.dt  # -> Hz
 

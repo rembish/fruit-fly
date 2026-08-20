@@ -1,11 +1,11 @@
 # fruit-fly 🪰
 
-A fly that lives on your Linux desktop, driven by the **complete real brain
-of a fruit fly** — the [FlyWire](https://flywire.ai/) connectome of adult
-*Drosophila melanogaster*: 139,255 neurons and ~34 million synapses, every
-one of them mapped from an actual fly by actual scientists, simulated live
-as leaky integrate-and-fire neurons while the sprite buzzes over your
-windows.
+A fly that lives on your desktop — Linux, macOS or Windows — driven by the
+**complete real brain of a fruit fly**: the [FlyWire](https://flywire.ai/)
+connectome of adult *Drosophila melanogaster*, 139,255 neurons and ~34
+million synapses, every one of them mapped from an actual fly by actual
+scientists, simulated live as leaky integrate-and-fire neurons while the
+sprite buzzes over your windows.
 
 No scripted behavior, no random walk. When the fly dodges your cursor it is
 because your cursor was fed into its real looming-detector neurons (LC4,
@@ -17,7 +17,7 @@ neuron decided to.
 ## How it works
 
 ```
-your screen ──► RETINOTOPIC EYES: 785+796 real eye columns, 9,199 mapped
+your screen ──► RETINOTOPIC EYES: 785+796 real eye columns, 6,670 mapped
                 photoreceptors + 4,541 lamina cells, each driven by the
                 actual pixels its column sees (cursor rendered with
                 perspective: it looms as it approaches)               ─┐
@@ -142,7 +142,7 @@ The HUD keeps score.
 
 Quit with Ctrl-C in the terminal. On Linux this needs a compositing
 window manager for transparency (MATE: System → Preferences → Windows →
-enable compositing); macOS always composites.
+enable compositing); macOS and Windows always composite.
 
 ## Things to try
 

@@ -3,13 +3,12 @@
 Run:  python3 tests/test_brain.py
 """
 
+import os
 import sys
 import time
-import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import numpy as np
 from fruitfly import data
 from fruitfly.brain import Brain, RateMonitor
 
@@ -31,7 +30,7 @@ def main():
     gf_spikes = 0
     t0 = time.perf_counter()
     total = 0
-    for i in range(500):
+    for _ in range(500):
         s = b.step()
         total += len(s)
         mon.update(s)
@@ -39,8 +38,9 @@ def main():
     wall = time.perf_counter() - t0
     print(f"[loom]  500 ms of looming: total spikes {total}, "
           f"GF spikes {gf_spikes} (expect > 0)")
+    d_l, d_r = mon.rates["DNa02_L"], mon.rates["DNa02_R"]
     print(f"[loom]  descending rate {mon.rates['descending']:.2f} Hz, "
-          f"DNa02 L/R {mon.rates['DNa02_L']:.1f}/{mon.rates['DNa02_R']:.1f} Hz")
+          f"DNa02 L/R {d_l:.1f}/{d_r:.1f} Hz")
     print(f"[speed] {wall:.2f} s wall for 0.5 s biological "
           f"({0.5 / wall:.2f}x real time)")
 
@@ -53,7 +53,8 @@ def main():
         wall = time.perf_counter() - t0
         hz = total / (n * 0.5)
         print(f"[noise] rate={rate:>5} Hz w={w} synapses -> mean activity "
-              f"{hz:.3f} Hz/neuron, {total} spikes/0.5s, {0.5/wall:.2f}x real time")
+              f"{hz:.3f} Hz/neuron, {total} spikes/0.5s, "
+              f"{0.5/wall:.2f}x real time")
 
     # ---- 4. photoreceptor drive cost ------------------------------------
     b = Brain(indptr, indices, weights, pops, dt=1.0,

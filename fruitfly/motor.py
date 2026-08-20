@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import math
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 FLYING, LANDED, ESCAPE, SQUASHED = "flying", "landed", "escape", "squashed"
 TAKEOFF = "takeoff"   # startled: wings up, feet still down — squashable!
@@ -127,7 +127,8 @@ class MotorMap:
         self._land_drive = 0.0
 
     def update(self, dt: float, t: float, rates: dict[str, float],
-               gf_count: int, threat_bearing: float, threat: float) -> MotorState:
+               gf_count: int, threat_bearing: float,
+               threat: float) -> MotorState:
         st = self.st
 
         if st.state == SQUASHED:
@@ -203,8 +204,10 @@ class MotorMap:
             turn = (dna_r - dna_l) * 0.12
             st.heading += max(-5.0, min(5.0, turn)) * dt
             # body saccade: descending bursts kick the heading
-            if self.rng.random() < min(0.9, max(0.0, desc - 4.0) * 0.10) * dt * 10:
-                st.heading += self.rng.choice((-1, 1)) * self.rng.uniform(0.5, 1.6)
+            p_saccade = min(0.9, max(0.0, desc - 4.0) * 0.10) * dt * 10
+            if self.rng.random() < p_saccade:
+                st.heading += (self.rng.choice((-1, 1))
+                               * self.rng.uniform(0.5, 1.6))
                 st.last_event = "descending burst -> saccade"
             target = 90.0 + 45.0 * min(10.0, desc) + 60.0 * min(5.0, fwd) \
                 - 40.0 * min(5.0, back)
@@ -240,7 +243,8 @@ class MotorMap:
                 self._takeoff_drive = 0.0
                 self._land_drive = 0.0
                 self._land_thresh = self.rng.uniform(*self.LAND_THRESH)
-            elif self._takeoff_drive > self.rng.uniform(*self.TAKEOFF_THRESH):
+            elif self._takeoff_drive > self.rng.uniform(
+                    *self.TAKEOFF_THRESH):
                 self._startle(t, "descending activity -> takeoff",
                               escape=False)
                 self._takeoff_drive = 0.0

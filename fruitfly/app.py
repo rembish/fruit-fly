@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from . import data
 from .brain import Brain
 from .core import Controller
-from .senses import Senses, Retina
+from .senses import Retina, Senses
 from .ui import create_host
 
 
@@ -12,8 +13,6 @@ def run(noise_rate: float = 100.0, noise_weight: float = 3.0,
         inh_gain: float = 1.5, dt: float = 2.0, size: float = 34.0,
         hud: bool = False, vision: bool = True, pure_retina: bool = False,
         backend: str | None = None, seed: int | None = None):
-    from . import data
-
     print("[app] loading connectome ...")
     indptr, indices, weights, pops, retina_data = data.load()
     brain = Brain(indptr, indices, weights, pops, dt=dt,

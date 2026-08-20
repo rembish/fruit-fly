@@ -19,14 +19,21 @@ Design notes:
 
 from __future__ import annotations
 
+import contextlib
+from typing import TYPE_CHECKING
+
+import cairo
 import numpy as np
 
+from ..core import HUD_H, HUD_W, WIN
 from .base import Host, rgb_to_luminance
-from ..core import WIN, HUD_W, HUD_H
+
+if TYPE_CHECKING:
+    from ..core import Controller
 
 try:
-    import objc
     import AppKit
+    import objc
     import Quartz
     from PyObjCTools import AppHelper
     _IMPORT_ERROR = None
@@ -125,13 +132,11 @@ class CocoaHost(Host):
         return True, ""
 
     def __init__(self, hud: bool = False):
-        import cairo
-
         if _IMPORT_ERROR is not None:
             raise RuntimeError(self.available()[1])
         self._cairo = cairo
-        self.controller = None
-        self._capture_ok = None
+        self.controller: Controller | None = None
+        self._capture_ok: bool | None = None
 
         self.app = AppKit.NSApplication.sharedApplication()
         # accessory: no Dock icon, no menu bar takeover
@@ -244,6 +249,7 @@ class CocoaHost(Host):
     # ------------------------------------------------------------ render
     def render(self, hud: bool = False):
         """Draw the current frame with cairo, return it as a CGImage."""
+        assert self.controller is not None, "attach() before run()"
         if hud:
             if self._hud_surface is None:
                 return None
@@ -255,7 +261,7 @@ class CocoaHost(Host):
         return _cairo_surface_to_cgimage(self._fly_surface, WIN, WIN)
 
     # ------------------------------------------------------- wiring/loop
-    def attach(self, controller):
+    def attach(self, controller: Controller) -> None:
         self.controller = controller
 
     def run(self):
@@ -270,10 +276,8 @@ class CocoaHost(Host):
                        .scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
                            1.0 / 60.0, ticker, objc.selector(
                                ticker.tick_, signature=b"v@:@"), None, True))
-        try:
+        with contextlib.suppress(KeyboardInterrupt):
             AppHelper.runEventLoop(installInterrupt=True)
-        except KeyboardInterrupt:
-            pass
 
     def shutdown(self):
         timer = getattr(self, "_timer", None)

@@ -1,7 +1,7 @@
 """Platform-independent fly logic: brain thread, senses, motor, drawing.
 
-Everything here is shared between the GTK (Linux/X11) and Cocoa (macOS)
-backends. A backend supplies a small host interface:
+Everything here is shared by every window backend (GTK on Linux, Cocoa
+on macOS, Win32 on Windows). A backend supplies a small host interface:
 
     host.screen_size()              -> (w, h) in logical pixels
     host.pointer()                  -> (x, y), top-left origin, y down
@@ -22,8 +22,8 @@ import cairo
 import numpy as np
 
 from .brain import Brain, RateMonitor
-from .senses import Senses, SensoryFrame, EYE_RADIUS, PATCH
-from .motor import MotorMap, FLYING, LANDED, ESCAPE, SQUASHED, TAKEOFF
+from .motor import ESCAPE, FLYING, LANDED, SQUASHED, TAKEOFF, MotorMap
+from .senses import EYE_RADIUS, PATCH, Senses, SensoryFrame
 from .sprite import draw_fly, draw_splat
 
 MOTOR_POPS = ["GF", "DNa02_L", "DNa02_R", "DNp09", "MDN", "descending",
@@ -96,7 +96,8 @@ class BrainThread(threading.Thread):
                 with self.shared.lock:
                     self.shared.sim_speed = ((b.t - window_sim0) * 1e-3
                                              / (now - window_t0))
-                    self.shared.spikes_per_s = spikes_window / (now - window_t0)
+                    self.shared.spikes_per_s = (spikes_window
+                                                / (now - window_t0))
                 window_t0, window_sim0, spikes_window = now, b.t, 0
 
 

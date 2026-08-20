@@ -16,9 +16,10 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import numpy as np
+
 from fruitfly import data
 from fruitfly.brain import Brain, RateMonitor
-from fruitfly.senses import Retina, Senses, SensoryFrame, PATCH
+from fruitfly.senses import PATCH, Retina, Senses, SensoryFrame
 
 POPS = ["GF", "LC4_L", "LC4_R", "LPLC2_L", "LPLC2_R",
         "DNa02_L", "DNa02_R", "descending"]
@@ -76,7 +77,8 @@ def main():
         frame.patch_L = np.where(disc, 0.06, 0.55).astype(np.float32)
         g, lc, lp = run_epoch(brain, mon, senses, frame, TICK,
                               f"  loom r={r:4.1f}px")
-        gf_max, lc_max, lp_max = max(gf_max, g), max(lc_max, lc), max(lp_max, lp)
+        gf_max = max(gf_max, g)
+        lc_max, lp_max = max(lc_max, lc), max(lp_max, lp)
 
     print("== recovery ==")
     frame.patch_L = np.full((PATCH, PATCH), 0.55, dtype=np.float32)
@@ -93,7 +95,8 @@ def main():
         gf_dim = max(gf_dim, g)
 
     print()
-    print(f"baseline GF {gf0:.1f} Hz, LC4_L {lc0:.1f} Hz, LPLC2_L {lp0:.1f} Hz")
+    print(f"baseline GF {gf0:.1f} Hz, LC4_L {lc0:.1f} Hz, "
+          f"LPLC2_L {lp0:.1f} Hz")
     print(f"loom     GF {gf_max:.1f} Hz, LC4_L {lc_max:.1f} Hz, "
           f"LPLC2_L {lp_max:.1f} Hz")
     print(f"dimming  GF {gf_dim:.1f} Hz (loom-selectivity check)")

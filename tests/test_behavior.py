@@ -6,7 +6,6 @@ including a scripted "cursor attack" at t=10s, and logs what the fly does.
 Run:  python3 tests/test_behavior.py
 """
 
-import math
 import os
 import sys
 import time
@@ -14,10 +13,11 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import numpy as np
+
 from fruitfly import data
 from fruitfly.brain import Brain, RateMonitor
-from fruitfly.senses import Senses, SensoryFrame, Retina, PATCH
 from fruitfly.motor import MotorMap
+from fruitfly.senses import PATCH, Retina, Senses, SensoryFrame
 
 W, H = 1920, 1200
 MOTOR_POPS = ["GF", "DNa02_L", "DNa02_R", "DNp09", "MDN", "descending"]
@@ -77,14 +77,16 @@ def main():
     wall = time.perf_counter() - wall0
     print(f"30 bio-seconds in {wall:.1f} wall-seconds "
           f"({30/wall:.2f}x real time, {brain.total_spikes} spikes)")
-    print(f"time flying {states['flying']:.1f}s / landed {states['landed']:.1f}s"
-          f" / escaping {states['escape']:.1f}s;  GF spikes: {gf_total}")
+    print(f"time flying {states['flying']:.1f}s / "
+          f"landed {states['landed']:.1f}s / "
+          f"escaping {states['escape']:.1f}s;  GF spikes: {gf_total}")
     print("events:")
     for et, e in events:
         print(f"  t={et:5.1f}s  {e}")
 
     ok = gf_total > 0 and states["flying"] > 1.0 and states["landed"] > 1.0
-    print("PASS" if ok else "FAIL: expected escapes + both flying and landed time")
+    print("PASS" if ok else
+          "FAIL: expected escapes + both flying and landed time")
     return 0 if ok else 1
 
 

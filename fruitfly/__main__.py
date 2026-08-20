@@ -13,6 +13,8 @@ import argparse
 import os
 import sys
 
+from . import data
+
 
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="fruitfly", description=__doc__)
@@ -38,17 +40,14 @@ def main(argv=None):
     args = ap.parse_args(argv)
 
     if args.command == "fetch":
-        from . import data
         data.fetch()
         return
     if args.command == "prepare":
-        from . import data
         data.fetch()
         data.prepare()
         return
 
     # run/test need the compiled brain; build it if missing
-    from . import data
     brain_path = os.path.join(data.data_dir(), "brain.npz")
     if not os.path.exists(brain_path):
         print("[app] compiled brain not found — fetching & preparing "
@@ -61,7 +60,9 @@ def main(argv=None):
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
             "tests", "test_behavior.py")])
 
-    from .app import run
+    # imported late so `fetch`, `prepare` and `--help` work with no
+    # display toolkit installed (importing app pulls in a backend)
+    from .app import run  # noqa: PLC0415
     run(noise_rate=args.noise, inh_gain=args.inh, dt=args.dt,
         size=args.size, hud=args.hud, vision=not args.no_vision,
         pure_retina=args.pure_retina, backend=args.backend, seed=args.seed)

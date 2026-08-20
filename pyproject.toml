@@ -44,3 +44,39 @@ Homepage = "https://github.com/rembish/fruit-fly-linux"
 
 [tool.setuptools]
 packages = ["fruitfly", "fruitfly.ui"]
+
+[project.optional-dependencies]
+dev = ["ruff>=0.5", "mypy>=1.8"]
+
+[tool.ruff]
+line-length = 79
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "C4", "SIM", "RET", "ARG", "PL"]
+ignore = [
+    "PLR0913",  # many arguments: the tuning knobs are the point
+    "PLR2004",  # magic values: biological constants read better inline
+    "PLR0912",  # branches: the motor state machine is one honest chain
+    "PLR0915",  # statements, same
+]
+
+[tool.ruff.lint.per-file-ignores]
+# backends bind platform APIs that only exist on their own platform
+"fruitfly/ui/cocoa.py" = ["F821", "N802"]
+"fruitfly/ui/win32.py" = ["N802", "F821"]
+"tests/*" = ["E402"]          # sys.path setup must precede imports
+
+[tool.mypy]
+python_version = "3.10"
+files = ["fruitfly"]
+ignore_missing_imports = true      # gi, objc, AppKit, Quartz, cairo
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+# platform backends are only type-checkable on their own platform
+module = ["fruitfly.ui.cocoa", "fruitfly.ui.win32", "fruitfly.ui.gtk"]
+warn_unused_ignores = false

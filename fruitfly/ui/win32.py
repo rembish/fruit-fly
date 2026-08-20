@@ -20,22 +20,30 @@ Design notes:
 
 from __future__ import annotations
 
+import contextlib
 import ctypes
 import time
+from typing import TYPE_CHECKING
 
+import cairo
 import numpy as np
 
+from ..core import HUD_H, HUD_W, WIN
 from .base import Host
-from ..core import WIN, HUD_W, HUD_H
+
+if TYPE_CHECKING:
+    from ..core import Controller
 
 try:
     from ctypes import wintypes
 
-    user32 = ctypes.WinDLL("user32", use_last_error=True)
-    gdi32 = ctypes.WinDLL("gdi32", use_last_error=True)
-    _IMPORT_ERROR = None
+    # these ctypes members exist only on Windows, so type checkers on
+    # other platforms cannot see them
+    user32 = ctypes.WinDLL("user32", use_last_error=True)  # type: ignore[attr-defined]
+    gdi32 = ctypes.WinDLL("gdi32", use_last_error=True)  # type: ignore[attr-defined]
+    _IMPORT_ERROR: Exception | None = None
 except Exception as _e:                    # non-Windows, or no ctypes.WinDLL
-    wintypes = user32 = gdi32 = None
+    wintypes = user32 = gdi32 = None  # type: ignore[assignment]
     _IMPORT_ERROR = _e
 
 
@@ -75,7 +83,7 @@ WDA_EXCLUDEFROMCAPTURE = 0x00000011
 if _IMPORT_ERROR is None:                  # pragma: no cover - Windows only
 
     LRESULT = ctypes.c_ssize_t
-    WNDPROC = ctypes.WINFUNCTYPE(LRESULT, wintypes.HWND, wintypes.UINT,
+    WNDPROC = ctypes.WINFUNCTYPE(LRESULT, wintypes.HWND, wintypes.UINT,  # type: ignore[attr-defined]
                                  wintypes.WPARAM, wintypes.LPARAM)
 
     class POINT(ctypes.Structure):
@@ -143,7 +151,7 @@ def _top_down_dib(hdc, w, h):
     hbmp = gdi32.CreateDIBSection(hdc, ctypes.byref(bmi), DIB_RGB_COLORS,
                                   ctypes.byref(bits), None, 0)
     if not hbmp or not bits.value:
-        raise ctypes.WinError(ctypes.get_last_error())
+        raise ctypes.WinError(ctypes.get_last_error())  # type: ignore[attr-defined]
     buf = (ctypes.c_char * (w * h * 4)).from_address(bits.value)
     return hbmp, buf
 
@@ -152,29 +160,26 @@ class _LayeredWindow:
     """One transparent, always-on-top, cairo-painted window."""
 
     def __init__(self, host, w, h, clickable: bool):
-        import cairo
-
         self.host = host
         self.w, self.h = w, h
         self.clickable = clickable
         self.origin = [0, 0]
 
-        ex = WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE
+        ex = (WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW
+              | WS_EX_NOACTIVATE)
         if not clickable:
             ex |= WS_EX_TRANSPARENT
         self.hwnd = user32.CreateWindowExW(
             ex, host.class_name, "fruitfly", WS_POPUP,
             0, 0, w, h, None, None, host.hinstance, None)
         if not self.hwnd:
-            raise ctypes.WinError(ctypes.get_last_error())
+            raise ctypes.WinError(ctypes.get_last_error())  # type: ignore[attr-defined]  # type: ignore[attr-defined]
         host.windows[self.hwnd] = self
 
         # keep the fly out of its own eyes (Windows 10 2004+; ignore if old)
-        try:
+        with contextlib.suppress(Exception):
             user32.SetWindowDisplayAffinity(self.hwnd,
                                             WDA_EXCLUDEFROMCAPTURE)
-        except Exception:
-            pass
 
         self.screen_dc = user32.GetDC(None)
         self.mem_dc = gdi32.CreateCompatibleDC(self.screen_dc)
@@ -184,13 +189,12 @@ class _LayeredWindow:
         # the premultiplied BGRA that UpdateLayeredWindow expects
         self.surface = cairo.ImageSurface.create_for_data(
             memoryview(buf), cairo.FORMAT_ARGB32, w, h, w * 4)
-        self.cairo = cairo
 
     def show(self):
         user32.ShowWindow(self.hwnd, SW_SHOWNOACTIVATE)
 
     def paint(self, draw_fn):
-        cr = self.cairo.Context(self.surface)
+        cr = cairo.Context(self.surface)
         draw_fn(cr)
         self.surface.flush()
         pt_dst = POINT(int(self.origin[0]), int(self.origin[1]))
@@ -203,14 +207,12 @@ class _LayeredWindow:
             ctypes.byref(blend), ULW_ALPHA)
 
     def destroy(self):
-        try:
+        with contextlib.suppress(Exception):
             gdi32.SelectObject(self.mem_dc, self.old_bmp)
             gdi32.DeleteObject(self.hbmp)
             gdi32.DeleteDC(self.mem_dc)
             user32.ReleaseDC(None, self.screen_dc)
             user32.DestroyWindow(self.hwnd)
-        except Exception:
-            pass
 
 
 class Win32Host(Host):
@@ -226,13 +228,13 @@ class Win32Host(Host):
     def __init__(self, hud: bool = False):
         if _IMPORT_ERROR is not None:
             raise RuntimeError(self.available()[1])
-        self.controller = None
+        self.controller: Controller | None = None
         self.windows: dict = {}
         self._quit = False
-        self._capture = None
+        self._capture: tuple | None = None
 
         self._set_dpi_aware()
-        self.hinstance = ctypes.windll.kernel32.GetModuleHandleW(None)
+        self.hinstance = ctypes.windll.kernel32.GetModuleHandleW(None)  # type: ignore[attr-defined]
         self.class_name = "FruitflyWindow"
         self._wndproc = WNDPROC(self._on_message)   # keep alive!
         wc = WNDCLASSW()
@@ -240,9 +242,9 @@ class Win32Host(Host):
         wc.hInstance = self.hinstance
         wc.lpszClassName = self.class_name
         if not user32.RegisterClassW(ctypes.byref(wc)):
-            err = ctypes.get_last_error()
+            err = ctypes.get_last_error()  # type: ignore[attr-defined]
             if err not in (0, 1410):                # 1410: already registered
-                raise ctypes.WinError(err)
+                raise ctypes.WinError(err)  # type: ignore[attr-defined]
 
         self.scr_w = user32.GetSystemMetrics(SM_CXSCREEN)
         self.scr_h = user32.GetSystemMetrics(SM_CYSCREEN)
@@ -261,10 +263,8 @@ class Win32Host(Host):
                 return
         except Exception:
             pass
-        try:
+        with contextlib.suppress(Exception):
             user32.SetProcessDPIAware()
-        except Exception:
-            pass
 
     # ------------------------------------------------------- window proc
     def _on_message(self, hwnd, msg, wparam, lparam):
@@ -331,7 +331,7 @@ class Win32Host(Host):
         return arr[..., :3].mean(axis=2).astype(np.float32) / 255.0
 
     # -------------------------------------------------------------- loop
-    def attach(self, controller):
+    def attach(self, controller: Controller) -> None:
         self.controller = controller
 
     def run(self):
@@ -352,6 +352,7 @@ class Win32Host(Host):
                     user32.DispatchMessageW(ctypes.byref(msg))
                 if self._quit:
                     break
+                assert self.controller is not None, "attach() before run()"
                 self.controller.tick()
                 left = frame - (time.perf_counter() - t0)
                 if left > 0:

@@ -38,7 +38,7 @@ def draw_fly(cr, x: float, y: float, heading: float, size: float,
             cr.line_to(-9 * s, 5 * s * sy)
             cr.stroke()
     else:
-        for i, ang in enumerate((-0.9, -0.35, 0.35, 0.9, 2.2, -2.2)):
+        for ang in (-0.9, -0.35, 0.35, 0.9, 2.2, -2.2):
             lx = math.cos(ang) * 12 * s
             ly = math.sin(ang) * 10 * s
             cr.move_to(0, 0)
@@ -49,7 +49,8 @@ def draw_fly(cr, x: float, y: float, heading: float, size: float,
     if flying:
         # 200 Hz flapping reads as a blur: two wing arcs at sampled angles
         for sy in (-1, 1):
-            flap = 0.55 + 0.5 * math.sin(wing_phase + (0 if sy < 0 else math.pi))
+            phase = wing_phase + (0 if sy < 0 else math.pi)
+            flap = 0.55 + 0.5 * math.sin(phase)
             for a, alpha in ((flap, WING[3]), (flap * 0.55, WING[3] * 0.5)):
                 cr.save()
                 cr.translate(1 * s, 0)

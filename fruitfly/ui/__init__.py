@@ -6,6 +6,7 @@ for the running platform, or force one with `--backend`.
 
 from __future__ import annotations
 
+import importlib
 import sys
 
 from .base import Host
@@ -29,8 +30,6 @@ PLATFORM_ORDER = {
 
 def load(name: str) -> type[Host]:
     """Import and return a backend class by name."""
-    import importlib
-
     if name not in REGISTRY:
         raise ValueError(f"unknown backend {name!r}; "
                          f"known: {', '.join(sorted(REGISTRY))}")

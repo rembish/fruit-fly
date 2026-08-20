@@ -86,8 +86,9 @@ class Retina:
         darkening = np.clip(base - lum, 0.0, None)  # before baseline update
         base += (lum - base) * min(1.0, dt / self.TAU_ADAPT)
         contrast = lum - base
-        col_rates = np.clip(self.R_TONIC + self.GAIN * contrast
-                            + self.LUM_GAIN * lum, 0.0, self.R_MAX)
+        col_rates = np.clip(
+            self.R_TONIC + self.GAIN * contrast + self.LUM_GAIN * lum,
+            0.0, self.R_MAX)
         lam_rates = np.clip(self.L_R0 + self.L_GAIN * darkening,
                             0.0, self.L_MAX)
         return [(E["idx"], col_rates[E["col"]]),
@@ -138,7 +139,13 @@ class Senses:
         return (px, py), r_screen * scale
 
     def rates(self, frame: SensoryFrame, fly_x: float, fly_y: float,
-              heading: float, t: float) -> list:
+              heading: float, t: float
+              ) -> tuple[list, float, float]:
+        """Sense the world -> (brain stimuli, threat 0-1, cursor bearing).
+
+        Stimuli are (neuron_indices_or_population_name, rate_hz) pairs
+        ready for `Brain.set_stimulus`.
+        """
         dx = frame.cursor_x - fly_x
         dy = frame.cursor_y - fly_y
         dist = math.hypot(dx, dy)
@@ -153,7 +160,8 @@ class Senses:
             prox = 1.0 - dist / self.loom_radius
             threat = prox * prox
             if approach > 0:
-                threat += min(1.0, self.approach_gain * approach / 100.0) * prox
+                threat += prox * min(
+                    1.0, self.approach_gain * approach / 100.0)
             if dist < self.panic_radius:
                 threat = max(threat, 0.85)
         threat = min(1.0, threat)
