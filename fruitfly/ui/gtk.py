@@ -7,6 +7,7 @@ events only inside a square around the fly's body.
 from __future__ import annotations
 
 import contextlib
+import os
 from typing import TYPE_CHECKING
 
 import cairo
@@ -20,6 +21,18 @@ if TYPE_CHECKING:
 
 try:
     import gi
+
+    # WSLg and most modern desktops export WAYLAND_DISPLAY *and* DISPLAY.
+    # GDK then picks Wayland, where the root window is 0x0 (so grab() sees
+    # nothing) and move() is a compositor no-op (so the fly is pinned to
+    # wherever the compositor drops its window) — the fly ends up blind in
+    # a box mid-screen. This backend needs X11 semantics, so prefer
+    # XWayland whenever both are available. Like gi.require_version below,
+    # this MUST stay above the gi.repository import: GDK reads the variable
+    # when it opens the display, and an import-sorting pass that hoists the
+    # import above it silently brings the box back.
+    if os.environ.get("WAYLAND_DISPLAY") and os.environ.get("DISPLAY"):
+        os.environ.setdefault("GDK_BACKEND", "x11")
 
     # Every namespace needs its version pinned BEFORE the import line:
     # these names are imported in alphabetical order, so Gdk loads first
@@ -46,6 +59,16 @@ class GtkHost(Host):
                            f"gir1.2-gtk-3.0")
         if Gdk.Screen.get_default() is None:
             return False, "no display (is DISPLAY set?)"
+        display = Gdk.Display.get_default()
+        root = Gdk.get_default_root_window()
+        if ("Wayland" in type(display).__name__
+                or root is None or root.get_width() <= 0):
+            return False, (
+                f"GDK opened {type(display).__name__}, which has no usable "
+                f"root window: Wayland forbids client-side window "
+                f"positioning and offers no screen to grab, so the fly "
+                f"would be blind and stuck mid-screen. Run under "
+                f"X11/XWayland — check DISPLAY, or force GDK_BACKEND=x11.")
         return True, ""
 
     def __init__(self, hud: bool = False):
