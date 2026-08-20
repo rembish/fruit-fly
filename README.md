@@ -29,7 +29,7 @@ your screen ──► RETINOTOPIC EYES: 785+796 real eye columns, 9,199 mapped
                      DNa02 L/R rate difference ── steering
                      descending pool (1,305) ── fly / land / saccade
                                                    ▼
-                     transparent click-through GTK overlay on your desktop
+                     a small transparent window that follows the fly
 ```
 
 The eyes are real: each eye's hexagonal lattice of columns comes from the
@@ -83,14 +83,21 @@ fruitfly --dt 1.0       finer integration (slower; default 2.0 ms)
 fruitfly test           headless 30 s behavioral test, no window
 ```
 
-Quit with Ctrl-C in the terminal (the overlay is click-through by design —
-you cannot swat it. That is a feature and also the joke).
+Only a ~150 px transparent window travels with the fly — the rest of your
+screen has no window over it, and within that window only the fly's body
+accepts clicks. **Clicking the fly is a swat attempt**: the touch is fed
+into its real mechanosensory JO (Johnston's organ) neurons — the same
+pathway that drives the giant fiber in a living fly — and it escapes with
+a realistic ~200 ms reaction time. Good luck. The HUD counts your misses.
 
-Requires a compositing window manager for the transparent overlay (MATE:
-System → Preferences → Windows → enable compositing).
+Quit with Ctrl-C in the terminal. Requires a compositing window manager
+for transparency (MATE: System → Preferences → Windows → enable
+compositing).
 
 ## Things to try
 
+- Try to click the fly. Its mechanosensors fire and the giant fiber
+  decides. Landed flies are easier targets — briefly.
 - Rush your cursor at the fly: the looming response fires the giant fiber
   and it darts away (watch `GF` spike on the `--hud`).
 - Sneak the cursor up slowly: much weaker looming drive — you can get

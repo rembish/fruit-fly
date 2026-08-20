@@ -1,4 +1,10 @@
-"""The desktop overlay: a click-through window where the fly lives.
+"""The desktop fly: a small always-on-top window that follows the sprite.
+
+Only a ~150 px window travels with the fly — the rest of the screen has no
+window of ours over it. Within the window, the input shape covers just the
+fly's body: clicking the fly is a swat attempt (felt through its real
+mechanosensory JO neurons, escape decided by the brain); clicks anywhere
+else pass straight through to your desktop.
 
 Threads:
   GTK main loop  — draws the fly, samples cursor + screen luminance,
@@ -28,6 +34,10 @@ from .sprite import draw_fly
 
 MOTOR_POPS = ["GF", "DNa02_L", "DNa02_R", "DNp09", "MDN", "descending",
               "LC4_L", "LC4_R"]
+
+WIN = 150          # px, the little travelling window around the fly
+SWAT_S = 0.25      # s of mechanosensory drive after a click lands
+JO_SWAT_HZ = 150.0  # firing rate forced on JO neurons by a swat
 
 
 class Shared:
@@ -91,19 +101,80 @@ class BrainThread(threading.Thread):
                 window_t0, window_sim0, spikes_window = now, b.t, 0
 
 
+def _make_layer_window(screen, w, h):
+    win = Gtk.Window(type=Gtk.WindowType.POPUP)
+    win.set_default_size(w, h)
+    win.set_app_paintable(True)
+    win.set_keep_above(True)
+    win.set_skip_taskbar_hint(True)
+    win.set_skip_pager_hint(True)
+    win.set_accept_focus(False)
+    visual = screen.get_rgba_visual()
+    if visual is None:
+        raise RuntimeError(
+            "No RGBA visual — is the MATE compositor enabled? "
+            "(System > Preferences > Windows > enable software compositing)")
+    win.set_visual(visual)
+    return win
+
+
+class HudWindow:
+    """Small click-through telemetry panel in the top-left corner."""
+
+    def __init__(self, screen, owner):
+        self.owner = owner
+        self.win = _make_layer_window(screen, 620, 116)
+        self.win.move(10, 10)
+        self.win.connect("draw", self.on_draw)
+        self.win.connect("realize", lambda w: w.get_window()
+                         .input_shape_combine_region(cairo.Region(), 0, 0))
+        self.win.show_all()
+
+    def on_draw(self, _w, cr):
+        cr.set_operator(cairo.OPERATOR_SOURCE)
+        cr.set_source_rgba(0, 0, 0, 0)
+        cr.paint()
+        cr.set_operator(cairo.OPERATOR_OVER)
+        o = self.owner
+        with o.shared.lock:
+            rates = dict(o.shared.rates)
+            speed = o.shared.sim_speed
+            sps = o.shared.spikes_per_s
+        lines = [
+            f"sim {speed:4.2f}x real time   {sps/1000:6.1f}k spikes/s",
+            f"threat {o._threat:4.2f}   state {o.motor.st.state}   "
+            f"swats dodged {o.swats_dodged}",
+            "  ".join(f"{k} {rates.get(k, 0):5.1f}Hz"
+                      for k in ("GF", "DNa02_L", "DNa02_R", "descending")),
+            "  ".join(f"{k} {rates.get(k, 0):5.1f}Hz"
+                      for k in ("LC4_L", "LC4_R")) + "   (loom detectors)",
+            f"last: {o.motor.st.last_event}",
+        ]
+        cr.select_font_face("monospace", cairo.FONT_SLANT_NORMAL,
+                            cairo.FONT_WEIGHT_NORMAL)
+        cr.set_font_size(13)
+        y = 18
+        for line in lines:
+            cr.set_source_rgba(0, 0, 0, 0.55)
+            cr.rectangle(2, y - 14, 606, 19)
+            cr.fill()
+            cr.set_source_rgba(0.6, 1.0, 0.6, 0.95)
+            cr.move_to(6, y)
+            cr.show_text(line)
+            y += 19
+
+
 class FlyWindow(Gtk.Window):
     def __init__(self, brain: Brain, senses: Senses, size: float = 34.0,
                  hud: bool = False, vision: bool = True, verbose: bool = True):
         super().__init__(type=Gtk.WindowType.POPUP)
-        self.hud = hud
         self.vision = vision
         self.verbose = verbose
         self.size = size
 
         screen = self.get_screen()
         self.scr_w, self.scr_h = screen.get_width(), screen.get_height()
-        self.set_default_size(self.scr_w, self.scr_h)
-        self.move(0, 0)
+        self.set_default_size(WIN, WIN)
         self.set_app_paintable(True)
         self.set_keep_above(True)
         self.set_skip_taskbar_hint(True)
@@ -115,8 +186,10 @@ class FlyWindow(Gtk.Window):
                 "No RGBA visual — is the MATE compositor enabled? "
                 "(System > Preferences > Windows > enable software compositing)")
         self.set_visual(visual)
+        self.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
         self.connect("draw", self.on_draw)
         self.connect("realize", self.on_realize)
+        self.connect("button-press-event", self.on_swat)
 
         self.shared = Shared()
         self.senses = senses
@@ -125,20 +198,41 @@ class FlyWindow(Gtk.Window):
         self.frame = SensoryFrame()
         self._threat = 0.0
         self._bearing = 0.0
+        self._swat_until = 0.0
+        self.swats_dodged = 0
         self._last_tick = time.perf_counter()
         self._lum_tick = 0
         self._last_patch_t = time.perf_counter()
         self._t0 = time.perf_counter()
+        self._origin = (0, 0)
 
+        self.hud = HudWindow(screen, self) if hud else None
         self.brain_thread.start()
         GLib.timeout_add(16, self.tick)          # ~60 fps
         self.show_all()
 
     # ------------------------------------------------------------ window
     def on_realize(self, *_):
-        # completely click-through: empty input shape
+        self._update_input_shape()
+
+    def _update_input_shape(self):
+        # clickable only on the fly's body; everything else passes through
+        r = int(self.size * 0.5) + 4
+        rect = cairo.RectangleInt(x=WIN // 2 - r, y=WIN // 2 - r,
+                                  width=2 * r, height=2 * r)
         self.get_window().input_shape_combine_region(
-            cairo.Region(), 0, 0)
+            cairo.Region(rect), 0, 0)
+
+    # -------------------------------------------------------------- swat
+    def on_swat(self, _w, _event):
+        # a click landed on the fly: felt as touch through its real
+        # mechanosensory JO neurons; the brain decides what happens next
+        self._swat_until = time.perf_counter() - self._t0 + SWAT_S
+        self.swats_dodged += 1
+        if self.verbose:
+            print(f"[fly] SWAT! (attempt #{self.swats_dodged}) — "
+                  f"JO mechanosensors firing", flush=True)
+        return True
 
     # ------------------------------------------------------------ senses
     def sample_senses(self):
@@ -183,6 +277,9 @@ class FlyWindow(Gtk.Window):
         st = self.motor.st
         stim, self._threat, self._bearing = self.senses.rates(
             self.frame, st.x, st.y, st.heading, t)
+        if t < self._swat_until:   # being touched: maximal alarm
+            stim.append(("JO", JO_SWAT_HZ))
+            self._threat = 1.0
 
         with self.shared.lock:
             self.shared.stim = stim
@@ -197,7 +294,14 @@ class FlyWindow(Gtk.Window):
             print(f"[fly t={t:7.1f}s sim {speed:.2f}x] {st.last_event}",
                   flush=True)
 
+        # the little window follows the fly
+        origin = (int(st.x) - WIN // 2, int(st.y) - WIN // 2)
+        if origin != self._origin:
+            self._origin = origin
+            self.move(*origin)
         self.queue_draw()
+        if self.hud is not None:
+            self.hud.win.queue_draw()
         return True
 
     # -------------------------------------------------------------- draw
@@ -208,41 +312,11 @@ class FlyWindow(Gtk.Window):
         cr.set_operator(cairo.OPERATOR_OVER)
 
         st = self.motor.st
-        draw_fly(cr, st.x, st.y, st.heading, self.size,
+        draw_fly(cr, WIN / 2, WIN / 2, st.heading, self.size,
                  flying=st.state in (FLYING, ESCAPE),
                  wing_phase=st.wing_phase,
                  escaping=st.state == ESCAPE)
-
-        if self.hud:
-            self.draw_hud(cr)
         return False
-
-    def draw_hud(self, cr):
-        with self.shared.lock:
-            rates = dict(self.shared.rates)
-            speed = self.shared.sim_speed
-            sps = self.shared.spikes_per_s
-        lines = [
-            f"sim {speed:4.2f}x real time   {sps/1000:6.1f}k spikes/s",
-            f"threat {self._threat:4.2f}   state {self.motor.st.state}",
-            "  ".join(f"{k} {rates.get(k, 0):5.1f}Hz"
-                      for k in ("GF", "DNa02_L", "DNa02_R", "descending")),
-            "  ".join(f"{k} {rates.get(k, 0):5.1f}Hz"
-                      for k in ("LC4_L", "LC4_R")) + "   (loom detectors)",
-            f"last: {self.motor.st.last_event}",
-        ]
-        cr.select_font_face("monospace", cairo.FONT_SLANT_NORMAL,
-                            cairo.FONT_WEIGHT_NORMAL)
-        cr.set_font_size(13)
-        y = 28
-        for line in lines:
-            cr.set_source_rgba(0, 0, 0, 0.55)
-            cr.rectangle(12, y - 14, 560, 19)
-            cr.fill()
-            cr.set_source_rgba(0.6, 1.0, 0.6, 0.95)
-            cr.move_to(16, y)
-            cr.show_text(line)
-            y += 19
 
     def shutdown(self):
         self.shared.stop = True
