@@ -1,0 +1,132 @@
+# fruit-fly-linux 🪰
+
+A fly that lives on your Linux desktop, driven by the **complete real brain
+of a fruit fly** — the [FlyWire](https://flywire.ai/) connectome of adult
+*Drosophila melanogaster*: 139,255 neurons and ~34 million synapses, every
+one of them mapped from an actual fly by actual scientists, simulated live
+as leaky integrate-and-fire neurons while the sprite buzzes over your
+windows.
+
+No scripted behavior, no random walk. When the fly dodges your cursor it is
+because your cursor was fed into its real looming-detector neurons (LC4,
+LPLC2), which drove its real giant fiber escape neuron (DNp01) through real
+synapses, exactly the circuit a living fly uses to evade your rolled-up
+newspaper. When it takes off, lands, or jinks for no reason at all — a
+neuron decided to.
+
+## How it works
+
+```
+your screen ──► photoreceptors (11,151 neurons)  ─┐
+your cursor ──► looming detectors LC4/LPLC2 (314) ─┤
+                                                   ▼
+                     WHOLE-BRAIN LIF SIMULATION (139,255 neurons,
+                     2.7M connections, ~34M synapses, real time)
+                                                   │
+                     giant fiber DNp01 ── escape! ─┤
+                     DNa02 L/R rate difference ── steering
+                     descending pool (1,305) ── fly / land / saccade
+                                                   ▼
+                     transparent click-through GTK overlay on your desktop
+```
+
+The model follows [Shiu et al. 2024, *Nature*](https://pubmed.ncbi.nlm.nih.gov/37205514/)
+(the first whole-brain fly simulation): connection weight = synapse count,
+sign from the machine-predicted neurotransmitter, uniform LIF parameters
+from fly electrophysiology. Connectivity comes straight from the public
+[FlyWire Codex](https://codex.flywire.ai/) data dump (snapshot 783,
+downloaded on first run, ~50 MB).
+
+## Install & run (MATE / any X11 desktop with compositing)
+
+Dependencies: GTK3 via GObject introspection plus numpy. On Debian/Ubuntu/Mint:
+
+```bash
+sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0 python3-numpy
+```
+
+then, from the repo:
+
+```bash
+python3 -m fruitfly            # downloads + compiles the brain on first run
+```
+
+or install it:
+
+```bash
+python3 -m venv --system-site-packages .venv && . .venv/bin/activate
+pip install -e .               # pinned versions in requirements.txt
+fruitfly
+```
+
+Options:
+
+```
+fruitfly --hud          live neural telemetry overlay (GF/DNa02/descending rates)
+fruitfly --size 48      bigger fly
+fruitfly --no-vision    don't sample screen luminance into the photoreceptors
+fruitfly --noise 140    more spontaneous brain activity (a more annoying fly)
+fruitfly --dt 1.0       finer integration (slower; default 2.0 ms)
+fruitfly test           headless 30 s behavioral test, no window
+```
+
+Quit with Ctrl-C in the terminal (the overlay is click-through by design —
+you cannot swat it. That is a feature and also the joke).
+
+Requires a compositing window manager for the transparent overlay (MATE:
+System → Preferences → Windows → enable compositing).
+
+## Things to try
+
+- Rush your cursor at the fly: the looming response fires the giant fiber
+  and it darts away (watch `GF` spike on the `--hud`).
+- Sneak the cursor up slowly: much weaker looming drive — you can get
+  closer before it bolts. This falls out of the circuit, it is not coded.
+- Just leave it alone and watch: takeoffs, landings, saccades and startle
+  hops arrive on the brain's own schedule.
+
+## Honest science notes
+
+What is real: the complete wiring diagram (every neuron, every connection
+≥5 synapses, signed by predicted neurotransmitter), the LIF dynamics and
+parameters of Shiu et al., and the identity of every input/output circuit
+used (photoreceptors, LC4/LPLC2 looming detectors, giant fiber, DNa02
+steering neurons, DNp09, MDN, the descending pool).
+
+What is added or approximated, and why:
+
+- **Background noise** (Poisson, central brain only): the connectome alone
+  is silent — a network with no input never fires. Real brains have
+  intrinsic noise and neuromodulation; ours is the source of all
+  spontaneous behavior, but every "decision" still propagates through the
+  real synapses.
+- **Spike-frequency adaptation + slow arousal homeostat**: without them
+  the model has only two states, coma and seizure (the paper only ever
+  stimulates it for fractions of a second from silence). Adaptation is
+  biologically standard and gives the network self-quenching bursts.
+- **Exponential synapses, dt = 2 ms** instead of alpha synapses at 0.1 ms:
+  calibrated to the same single-synapse PSP peak (0.275 mV), traded for
+  real-time speed.
+- **A higher giant-fiber threshold and rate-based motor readout**: the real
+  GF is a huge neuron famous for its high threshold; and real motor
+  circuits threshold their drive — the wing motor neurons live in the
+  ventral nerve cord, which is a separate connectome not included here.
+  The final translation of descending-neuron rates into 2D screen motion
+  is ours, and is the least principled part of the project. It is also
+  the part that makes it a desktop toy instead of a paper.
+
+## Layout
+
+```
+fruitfly/data.py     download + compile the connectome into data/brain.npz
+fruitfly/brain.py    event-driven whole-brain LIF engine (numpy)
+fruitfly/senses.py   cursor -> looming neurons, screen -> photoreceptors
+fruitfly/motor.py    descending neurons -> flight kinematics
+fruitfly/sprite.py   the fly, in cairo
+fruitfly/app.py      transparent click-through GTK overlay + brain thread
+tests/               circuit tests and a headless closed-loop behavior test
+```
+
+Data credit: [FlyWire](https://flywire.ai/) (Dorkenwald et al., Schlegel et
+al., *Nature* 2024), used under its public data terms. Model design after
+Shiu et al., *Nature* 2024.

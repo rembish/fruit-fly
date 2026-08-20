@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fruitfly"
+version = "0.1.0"
+description = "A desktop fly driven by the real FlyWire Drosophila connectome — 139k neurons buzzing over your MATE desktop"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Alex Rembish", email = "alex@rembish.org" }]
+keywords = ["connectome", "drosophila", "flywire", "desktop-pet", "neuroscience", "simulation"]
+classifiers = [
+    "Environment :: X11 Applications :: GTK",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Desktop Environment",
+]
+
+# PyGObject and pycairo are best installed from your distribution
+# (python3-gi, python3-gi-cairo, gir1.2-gtk-3.0) — building them via pip
+# needs GTK C headers. numpy is the only hard pip dependency.
+dependencies = [
+    "numpy>=1.24",
+    "PyGObject>=3.42",
+    "pycairo>=1.20",
+]
+
+[project.scripts]
+fruitfly = "fruitfly.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/rembish/fruit-fly-linux"
+
+[tool.setuptools]
+packages = ["fruitfly"]
