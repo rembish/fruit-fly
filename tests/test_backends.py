@@ -24,6 +24,7 @@ from fruitfly.brain import Brain
 from fruitfly.core import HUD_H, HUD_W, WIN, Controller
 from fruitfly.motor import LANDED, SQUASHED, TAKEOFF
 from fruitfly.senses import Retina, Senses
+from fruitfly.sprite import draw_fly
 from fruitfly.ui.base import Host
 
 
@@ -194,6 +195,31 @@ def test_layered_window_pixel_contract():
     print("layered-window pixel contract OK (premultiplied BGRA, zero-copy)")
 
 
+def test_landed_fly_shows_its_wings():
+    """A landed fly must actually have visible wings.
+
+    They used to be painted before the abdomen, which is opaque, so all
+    that escaped was the sliver poking past the abdomen tip -- sheared by
+    a rotate-then-non-uniform-scale into something that read as a smudge.
+    Wings are bluish where the body is brown, so counting pixels whose
+    blue channel beats their red one measures exactly what was missing:
+    81 such pixels before the fix, 298 after.
+    """
+    w = h = 260
+    surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, w, h)
+    cr = cairo.Context(surface)
+    cr.set_source_rgb(1, 1, 1)
+    cr.paint()
+    draw_fly(cr, w / 2, h / 2, 0.0, 110.0, flying=False, wing_phase=0.9)
+    surface.flush()
+    px = np.frombuffer(surface.get_data(), dtype=np.uint8)
+    px = px.reshape(h, surface.get_stride() // 4, 4)
+    blue, red = px[..., 0].astype(int), px[..., 2].astype(int)
+    wing = int(((blue > red + 6) & (red < 250)).sum())
+    assert wing > 150, f"landed fly shows only {wing} wing pixels"
+    print(f"landed fly shows {wing} wing pixels over the abdomen")
+
+
 def test_swat_semantics():
     _host, ctl = build()
     ctl.motor.st.state = LANDED
@@ -248,6 +274,7 @@ if __name__ == "__main__":
     test_blind_host_survives()
     test_drawing_surfaces()
     test_layered_window_pixel_contract()
+    test_landed_fly_shows_its_wings()
     test_swat_semantics()
     test_win32_signatures_declared()
     test_hit_radius()

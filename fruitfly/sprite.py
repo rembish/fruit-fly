@@ -60,17 +60,9 @@ def draw_fly(cr, x: float, y: float, heading: float, size: float,
                 _ellipse(cr, -11 * s, 0, 11 * s, 5.2 * s)
                 cr.fill()
                 cr.restore()
-    else:
-        # wings folded flat over the abdomen
-        for sy in (-1, 1):
-            cr.save()
-            cr.translate(-2 * s, 0)
-            cr.rotate(sy * 0.16)
-            cr.scale(1.0, 0.35)
-            cr.set_source_rgba(WING[0], WING[1], WING[2], 0.45)
-            _ellipse(cr, -8 * s, sy * 2.4 * s, 9.5 * s, 4.6 * s)
-            cr.fill()
-            cr.restore()
+    # a landed fly's wings fold back over the abdomen, so they are drawn
+    # after it, further down — painting them here put them underneath an
+    # opaque body, where they were invisible and the fly looked wingless.
 
     # abdomen (striped)
     cr.set_source_rgb(*BODY)
@@ -86,6 +78,18 @@ def draw_fly(cr, x: float, y: float, heading: float, size: float,
         cr.move_to(bx, -3.6 * s)
         cr.curve_to(bx - 1.2 * s, 0, bx - 1.2 * s, 0, bx, 3.6 * s)
         cr.stroke()
+
+    # wings folded back over the abdomen (see above). Rotated but never
+    # scaled non-uniformly: scaling a rotated ellipse shears it, which is
+    # what made these read as a smudge rather than as two wings.
+    if not flying:
+        for sy in (-1, 1):
+            cr.save()
+            cr.rotate(sy * 0.20)          # a V, tips just past the abdomen
+            cr.set_source_rgba(WING[0], WING[1], WING[2], 0.30)
+            _ellipse(cr, -9.5 * s, 0, 10.5 * s, 2.3 * s)
+            cr.fill()
+            cr.restore()
 
     # thorax
     cr.set_source_rgb(*THORAX)
