@@ -32,6 +32,7 @@ NEEDS_CONNECTOME = {
     "test_drawing_surfaces",
     "test_grab_bounds_at_screen_edges",
     "test_hit_radius",
+    "test_poke_reaches_the_brain_and_expires",
     "test_retina_and_looming",
     "test_swat_semantics",
 }

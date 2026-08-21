@@ -255,6 +255,32 @@ def test_shadow_does_not_turn_with_the_fly():
     print(f"shadow stays put as the fly turns ({differing} px asymmetry)")
 
 
+def test_poke_reaches_the_brain_and_expires():
+    """`poke` must inject into the real stimulus stream, then let go.
+
+    This is the whole basis of the feature being honest: the fly has no
+    scripted reaction to a poke. Whatever the body does next is the rest
+    of the connectome responding to a real population being driven.
+    """
+    _host, ctl = build()
+    assert "no population" in ctl.poke("NOT_A_NEURON")
+    assert "positive" in ctl.poke("GF", 0.0)
+    assert "GF" in ctl.poke("GF", 200.0, 5.0)
+
+    ctl.tick()
+    with ctl.shared.lock:
+        stim = list(ctl.shared.stim)
+    driven = [(n, r) for n, r in stim if isinstance(n, str)]
+    assert ("GF", 200.0) in driven, driven
+
+    ctl._poke = ("GF", 200.0, -1.0)          # pretend it has elapsed
+    ctl.tick()
+    with ctl.shared.lock:
+        stim = list(ctl.shared.stim)
+    assert not any(n == "GF" for n, _ in stim if isinstance(n, str))
+    print("poke reaches the brain as stimulus, and releases on time")
+
+
 def test_swat_semantics():
     _host, ctl = build()
     ctl.motor.st.state = LANDED
@@ -311,6 +337,7 @@ if __name__ == "__main__":
     test_layered_window_pixel_contract()
     test_landed_fly_shows_its_wings()
     test_shadow_does_not_turn_with_the_fly()
+    test_poke_reaches_the_brain_and_expires()
     test_swat_semantics()
     test_win32_signatures_declared()
     test_hit_radius()

@@ -175,6 +175,24 @@ Stop the fly with `Ctrl-C` in the terminal that started it. If it ever
 refuses to die, `pkill -f fruitfly` always works: it has no menu bar and no
 `Cmd-Q`, because its windows are deliberately non-activating.
 
+## Poke the circuit
+
+With the fly running, type a population name into the terminal that started
+it and press Enter. `GF` and it escapes; `MDN` and it scoots backwards;
+`DNa02_L` and it turns that way; `?` lists all 35, including left/right
+variants. Optional rate and duration: `LC4_R 150 1.0`.
+
+Nothing about the reaction is scripted. The poke drives that population's
+real neurons as a Poisson source, exactly the way the retina drives
+photoreceptors, and what the body does next is the rest of the connectome
+responding. Measured headlessly with the cursor 5,000 px away so nothing
+visual could interfere: six two-second windows containing a `GF` poke
+produced 10 escape-class events, and six windows without produced none.
+
+The terminal is the input channel because the fly's windows are
+deliberately non-activating — they never take keyboard focus — and reading
+stdin needs no permission on any platform.
+
 ## Things to try
 
 - Try to click the fly. Its mechanosensors fire and the giant fiber

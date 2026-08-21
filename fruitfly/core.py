@@ -108,6 +108,8 @@ class Controller:
                  size: float = 34.0, vision: bool = True,
                  verbose: bool = True):
         self.host = host
+        self.pops = list(brain.pops)      # what poke() may drive
+        self._poke: tuple[str, float, float] | None = None
         self.size = size
         self.vision = vision
         self.verbose = verbose
@@ -197,6 +199,24 @@ class Controller:
         self.frame.patch_dt = min(0.5, now - self._last_patch_t)
         self._last_patch_t = now
 
+    # -------------------------------------------------------------- poke
+    def poke(self, target: str, hz: float = 120.0,
+             seconds: float = 0.4) -> str:
+        """Drive one real population, then watch what the body does.
+
+        The optogenetics knob: the fly has no scripted response to this.
+        Whatever happens next is the rest of the connectome reacting --
+        drive GF and it should escape, drive one side's DNa02 and it
+        should turn that way, drive MDN and it should scoot backwards.
+        """
+        if target not in self.pops:
+            return f"no population {target!r}"
+        if hz <= 0.0 or seconds <= 0.0:
+            return "rate and duration must both be positive"
+        now = time.perf_counter() - self._t0
+        self._poke = (target, float(hz), now + float(seconds))
+        return f"poking {target} at {hz:.0f} Hz for {seconds:.2f}s"
+
     # -------------------------------------------------------------- tick
     def tick(self):
         now = time.perf_counter()
@@ -211,6 +231,16 @@ class Controller:
         if t < self._swat_until:   # being touched: maximal alarm
             stim.append(("JO", JO_SWAT_HZ))
             self._threat = 1.0
+
+        poke = self._poke                 # see poke(); one at a time
+        if poke is not None:
+            name, hz, until = poke
+            if t < until:
+                stim.append((name, hz))
+            else:
+                self._poke = None
+                if self.verbose:
+                    print(f"[poke] {name} released", flush=True)
 
         with self.shared.lock:
             self.shared.stim = stim
@@ -257,8 +287,10 @@ class Controller:
             rates = dict(self.shared.rates)
             speed = self.shared.sim_speed
             sps = self.shared.spikes_per_s
+        poke = self._poke
         lines = [
-            f"sim {speed:4.2f}x real time   {sps/1000:6.1f}k spikes/s",
+            (f"sim {speed:4.2f}x real time   {sps/1000:6.1f}k spikes/s"
+             + (f"   POKE {poke[0]} {poke[1]:.0f}Hz" if poke else "")),
             f"threat {self._threat:4.2f}   state {self.motor.st.state}   "
             f"dodged {self.swats_dodged}   swatted {self.flies_swatted}",
             "  ".join(f"{k} {rates.get(k, 0):5.1f}Hz"

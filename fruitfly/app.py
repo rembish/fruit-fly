@@ -2,11 +2,46 @@
 
 from __future__ import annotations
 
+import sys
+import threading
+
 from . import bench, data
 from .brain import Brain
 from .core import Controller
 from .senses import Retina, Senses
 from .ui import create_host
+
+
+def _poke_console(controller) -> None:
+    """Read poke commands from the terminal that launched the fly.
+
+    The terminal is the one input channel that costs nothing: the fly's
+    windows are deliberately non-activating, so they never hold keyboard
+    focus, and reading stdin needs no permission on any platform.
+    """
+    usage = ("[poke] <population> [hz] [seconds]   e.g. `GF`, `MDN 150`, "
+             "`DNa02_L 120 1.0`;  `?` lists populations")
+    for raw in sys.stdin:
+        parts = raw.split()
+        if not parts:
+            continue
+        head = parts[0].lower()
+        if head in ("?", "h", "help", "list"):
+            print(f"[poke] {len(controller.pops)} populations: "
+                  f"{', '.join(controller.pops)}\n{usage}", flush=True)
+            continue
+        name = next((n for n in controller.pops if n.lower() == head), None)
+        if name is None:
+            print(f"[poke] no population {parts[0]!r}; `?` lists them",
+                  flush=True)
+            continue
+        try:
+            hz = float(parts[1]) if len(parts) > 1 else 120.0
+            secs = float(parts[2]) if len(parts) > 2 else 0.4
+        except ValueError:
+            print("[poke] rate and duration must be numbers", flush=True)
+            continue
+        print(f"[poke] {controller.poke(name, hz, secs)}", flush=True)
 
 
 def _autodetect_dt(indptr, indices, weights, pops, host, *,
@@ -58,6 +93,12 @@ def run(noise_rate: float = 100.0, noise_weight: float = 3.0,
     print(f"[app] brain ready: {brain.n} neurons, {len(indices)} connections, "
           f"{n_photo} retinotopic photoreceptors — releasing the fly "
           f"({host.name})")
+
+    if sys.stdin is not None and sys.stdin.isatty():
+        threading.Thread(target=_poke_console, args=(controller,),
+                         daemon=True, name="fly-poke").start()
+        print("[app] type a population name here to stimulate it "
+              "(`?` for the list) — the fly's reaction is not scripted")
 
     controller.start()
     try:
