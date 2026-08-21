@@ -56,6 +56,22 @@ a port that quietly became a different model; `smoke` is the one that
 catches a page that type-checks perfectly and shows nothing, which is a
 different failure and not a rarer one.
 
+## Deploying
+
+`web-v*` tags build the image and ship it; `.github/workflows/deploy-web.yml`
+does the work. **This repository is public, so it names no infrastructure
+and holds no credential.** Everything comes from GitHub:
+
+| kind | name | why |
+|---|---|---|
+| secret | `WIF_PROVIDER`, `WIF_SERVICE_ACCOUNT` | Workload Identity Federation — keyless, so there is no service-account JSON to leak |
+| secret | `CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_API_TOKEN` | optional CDN purge; the step skips cleanly when unset |
+| var | `GCP_PROJECT`, `GCP_REGION`, `AR_REPO`, `SERVICE_NAME` | identifiers rather than credentials, but a public repo has no reason to advertise which project to go looking at |
+
+A missing variable fails the job at its first step rather than
+half-deploying somewhere unexpected. The tag must match the version in
+`package.json`, which CI asserts.
+
 ## Layout
 
 ```

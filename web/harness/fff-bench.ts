@@ -272,6 +272,19 @@ function samplePatch(
   return out;
 }
 
+/**
+ * Pipe layout for one round.
+ *
+ * Multiplied rather than offset, and the difference is not cosmetic: at
+ * `seed + r` a run at seed 7 and a run at seed 11 shared 56 of their 60
+ * pipe layouts, so a "second seed" replicated 93% of the same game and
+ * the two agreed for reasons that had nothing to do with the fly. The
+ * prime spreads the runs apart so a replication is one.
+ */
+function roundSeed(seed: number, round: number): number {
+  return seed * 7919 + round;
+}
+
 interface Round {
   score: number;
   survived: number;
@@ -298,7 +311,7 @@ function replay(
       width: CANVAS_W,
       height: CANVAS_H,
       flapper: "fly", // presses come from `pressAt`; the arm decides those
-      seed: seed + r,
+      seed: roundSeed(seed, r),
     });
     let flaps = 0;
     // Rounds cannot run forever: a bird that never dies would hang the
@@ -334,7 +347,7 @@ function replayOracle(rounds: number, seed: number): Round[] {
       width: CANVAS_W,
       height: CANVAS_H,
       flapper: "fly",
-      seed: seed + r,
+      seed: roundSeed(seed, r),
     });
     let flaps = 0;
     const limit = Math.round(120 / DT_SIM);

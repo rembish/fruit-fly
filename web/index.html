@@ -3,105 +3,139 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Fruit Fly — Phase 2 bench</title>
+    <title>Fruit Fly Arcade</title>
+    <meta
+      name="description"
+      content="A real fruit fly connectome — 139,255 neurons — playing arcade games, badly, and measured doing it."
+    />
     <style>
       :root {
         color-scheme: dark;
         --ink: #e8ecf1;
         --dim: #8b95a3;
-        --line: #2a2f38;
+        --line: #262b34;
+        --lit: #5b8dd9;
       }
       * { box-sizing: border-box; }
       body {
         margin: 0;
-        padding: 24px 16px 48px;
-        background: #0d0f13;
+        padding: 56px 20px 72px;
+        background:
+          radial-gradient(1200px 600px at 50% -10%, #182031 0%, #0d0f13 60%);
         color: var(--ink);
-        font: 14px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+        font: 14px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 14px;
+        gap: 12px;
       }
-      h1 { font-size: 15px; font-weight: 600; margin: 0; letter-spacing: 0.02em; }
-      h1 span { color: var(--dim); font-weight: 400; }
-      #stage { position: relative; width: min(960px, 100%); }
-      canvas {
-        display: block;
-        width: 100%;
-        height: auto;
-        aspect-ratio: 960 / 540;
-        background: #11141a;
-        border: 1px solid var(--line);
-        border-radius: 6px;
-        cursor: crosshair;
-        touch-action: none;
-      }
-      #loading {
-        position: absolute;
-        inset: 0;
+      header { width: min(900px, 100%); }
+      h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: -0.01em; }
+      h1 .fly { font-size: 22px; }
+      .sub { color: var(--dim); margin: 0; max-width: 62ch; }
+      .hall {
+        width: min(900px, 100%);
         display: grid;
-        place-content: center;
-        gap: 10px;
-        justify-items: center;
-        background: rgba(13, 15, 19, 0.92);
-        border-radius: 6px;
-        text-align: center;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 14px;
+        margin-top: 22px;
       }
-      #bar { width: 240px; height: 3px; background: var(--line); border-radius: 2px; }
-      #bar div { height: 100%; width: 0; background: #5b8dd9; border-radius: 2px; }
-      #hud, #event {
-        width: min(960px, 100%);
-        white-space: pre-wrap;
-        color: var(--dim);
-      }
-      #event { color: #7fc98a; min-height: 1.55em; }
-      #poke { display: flex; flex-wrap: wrap; gap: 6px; width: min(960px, 100%); }
-      button {
-        font: inherit;
-        color: var(--ink);
-        background: #1a1f27;
+      .cab {
+        display: block;
+        text-decoration: none;
+        color: inherit;
         border: 1px solid var(--line);
-        border-radius: 4px;
-        padding: 4px 10px;
-        cursor: pointer;
+        border-radius: 8px;
+        padding: 16px;
+        background: #12151b;
+        transition: border-color 120ms, transform 120ms;
       }
-      button:hover { background: #232a34; }
-      p.note { width: min(960px, 100%); color: var(--dim); margin: 0; }
-      code { color: var(--ink); }
+      .cab.on:hover { border-color: var(--lit); transform: translateY(-2px); }
+      .cab.off { opacity: 0.42; cursor: default; }
+      .cab .name { font-weight: 600; font-size: 15px; }
+      .cab .tag {
+        font-size: 11px;
+        color: var(--lit);
+        border: 1px solid var(--lit);
+        border-radius: 3px;
+        padding: 0 5px;
+        margin-left: 7px;
+        vertical-align: 1px;
+      }
+      .cab.off .tag { color: var(--dim); border-color: var(--line); }
+      .cab p { color: var(--dim); margin: 8px 0 0; font-size: 13px; }
+      .notes { width: min(900px, 100%); margin-top: 34px; color: var(--dim); }
+      .notes h2 { font-size: 14px; color: var(--ink); margin: 0 0 8px; }
+      .notes p { margin: 0 0 10px; max-width: 70ch; }
+      a.plain { color: var(--lit); }
+      #bench { white-space: pre-wrap; color: #cbb46a; margin: 10px 0 0; }
     </style>
   </head>
   <body>
-    <h1>Fruit Fly <span>— Phase 2 bench: real connectome, real eyes, real body</span></h1>
+    <header>
+      <h1><span class="fly">🪰</span> Fruit Fly Arcade</h1>
+      <p class="sub">
+        The complete connectome of an adult <i>Drosophila melanogaster</i> —
+        139,255 neurons, 2.7 million connections, every one of them traced
+        from a real fly by real scientists — simulated live in your browser
+        and pointed at an arcade cabinet. It is not good at this. That is
+        the interesting part, and it is measured rather than asserted.
+      </p>
+    </header>
 
-    <div id="stage">
-      <canvas id="view" width="960" height="540"></canvas>
-      <div id="loading">
-        <div>waking the fly</div>
-        <div id="bar"><div></div></div>
-        <div id="note" style="color: var(--dim)"></div>
+    <div class="hall">
+      <a class="cab on" href="/fff/">
+        <span class="name">Fruit Flappy Fly</span><span class="tag">lit</span>
+        <p>
+          A fly in a chamber presses a plate; the plate flaps a bird through
+          pipes. Two modes — the fly as joystick, or the fly as the bird.
+        </p>
+      </a>
+      <a class="cab on" href="/bench/">
+        <span class="name">Just the fly</span><span class="tag">lit</span>
+        <p>
+          No game. The fly loose on a canvas, with buttons that drive one
+          real population and a live readout of what fired.
+        </p>
+      </a>
+      <div class="cab off">
+        <span class="name">Pong</span><span class="tag">dark</span>
+        <p>
+          The purest fit and the next one built: paddle x = fly x, no
+          buttons, nothing invented. The motor output <i>is</i> the paddle.
+        </p>
+      </div>
+      <div class="cab off">
+        <span class="name">Tetris</span><span class="tag">dark</span>
+        <p>
+          Ranked the weakest fit for a fly, which is exactly why it is
+          queued: the board fills to a still image while the fly sits, and
+          that is the joke rather than a reason to skip it.
+        </p>
       </div>
     </div>
 
-    <div id="event"></div>
-    <div id="hud"></div>
+    <div class="notes">
+      <h2>What the measurement says</h2>
+      <p id="bench">—</p>
+      <p>
+        Nothing here is scripted and nothing here learns. This fly cannot
+        improve, because it has no plasticity: it is the same wiring on
+        every run, and a bad score is not a fly having an off day. The
+        honest framing is a benchmark with a control arm, not a
+        leaderboard.
+      </p>
+      <p>
+        Connectome:
+        <a class="plain" href="https://flywire.ai/">FlyWire</a> snapshot 783
+        (Dorkenwald et al. 2024; Schlegel et al. 2024), with eye columns
+        from Matsliah et al. 2024, licensed CC BY-NC 4.0 —
+        <a class="plain" href="/brain/DATA_LICENSE.md">DATA_LICENSE.md</a>.
+        Model after Shiu et al. 2024. Source:
+        <a class="plain" href="https://github.com/rembish/fruit-fly">github.com/rembish/fruit-fly</a>.
+      </p>
+    </div>
 
-    <div id="poke"></div>
-
-    <p class="note">
-      Move the pointer over the canvas — the fly sees it, with the angular
-      size a flat screen cannot supply, and treats it as a threat. Click on
-      the fly to swat: on the ground it squashes, airborne it is a glancing
-      blow. The buttons drive one real population directly; nothing about
-      the reaction is scripted.
-    </p>
-    <p class="note">
-      <code>sim</code> below 1.00x is the design working, not a bug. The
-      brain sets the pace and the whole world follows it, so a slow machine
-      shows the fly in honest slow motion with every tuned constant still
-      meaning what it meant.
-    </p>
-
-    <script type="module" src="/src/pages/bench.ts"></script>
+    <script type="module" src="/src/pages/hub.ts"></script>
   </body>
 </html>

@@ -1,0 +1,177 @@
+name: deploy the fly
+
+# The fly deploys itself, from its own repo, on its own tags. The only
+# thing the rembi.sh repo holds is one router line and one vitrine card.
+on:
+  push:
+    tags: ["web-v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# This repository is public, so nothing here names infrastructure and
+# nothing here holds a credential.
+#
+#   secrets   WIF_PROVIDER, WIF_SERVICE_ACCOUNT   (keyless: Workload
+#             Identity Federation, so there is no service-account JSON to
+#             leak in the first place)
+#             CLOUDFLARE_ZONE_ID, CLOUDFLARE_API_TOKEN  (optional)
+#   vars      GCP_PROJECT, GCP_REGION, AR_REPO, SERVICE_NAME
+#
+# The vars are identifiers rather than credentials, but a public repo has
+# no reason to advertise which project to go looking at. A missing var
+# fails the job at the guard below rather than half-deploying somewhere
+# unexpected.
+env:
+  PROJECT: ${{ vars.GCP_PROJECT }}
+  REGION: ${{ vars.GCP_REGION }}
+  SERVICE: ${{ vars.SERVICE_NAME }}
+  AR_REPO: ${{ vars.AR_REPO }}
+
+jobs:
+  check:
+    # A tag is not a licence to skip the gates. This is the same web job
+    # the branch builds run, plus the assertion that the tag and
+    # package.json agree — a `web-v1.2.0` tag on a 1.1.0 package would
+    # otherwise deploy something nobody asked for.
+    name: gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+        working-directory: web
+      - run: npm run typecheck
+        working-directory: web
+      - run: npm test
+        working-directory: web
+      - run: npm run build
+        working-directory: web
+      - name: The tag must match web/package.json
+        if: startsWith(github.ref, 'refs/tags/web-v')
+        working-directory: web
+        run: |
+          tag="${GITHUB_REF_NAME#web-v}"
+          pkg="$(node -p "require('./package.json').version ?? ''")"
+          echo "tag $tag, package $pkg"
+          test "$tag" = "$pkg" || {
+            echo "::error::tag web-v$tag does not match web/package.json ($pkg)"
+            exit 1
+          }
+      - name: Bundle budget
+        working-directory: web
+        # The brain is budgeted separately and lives outside dist/assets.
+        # This watches the code: a framework arriving by accident should
+        # fail the build rather than be discovered in a waterfall.
+        run: |
+          bytes=$(cat dist/assets/*.js | gzip -9 | wc -c)
+          echo "non-brain bundle: $bytes bytes gzipped"
+          test "$bytes" -lt 2097152 || {
+            echo "::error::bundle is over the 2 MB gzipped budget"
+            exit 1
+          }
+
+  deploy:
+    name: build and deploy
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Refuse to deploy without the configuration
+        run: |
+          missing=""
+          for v in PROJECT REGION SERVICE AR_REPO; do
+            eval "val=\$$v"
+            [ -n "$val" ] || missing="$missing $v"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::missing repository variables:$missing"
+            echo "set GCP_PROJECT, GCP_REGION, SERVICE_NAME and AR_REPO"
+            exit 1
+          fi
+          echo "REGISTRY=$REGION-docker.pkg.dev/$PROJECT/$AR_REPO" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v7
+      - uses: actions/cache@v6
+        with:
+          path: data
+          key: connectome-${{ hashFiles('fruitfly/data.py') }}
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build the image
+        run: |
+          docker build -f web/Dockerfile \
+            -t "$REGISTRY/$SERVICE:${GITHUB_SHA}" \
+            -t "$REGISTRY/$SERVICE:latest" .
+      - run: docker push "$REGISTRY/$SERVICE:${GITHUB_SHA}"
+      - run: docker push "$REGISTRY/$SERVICE:latest"
+
+      # Deploy without traffic first and prove the revision works before
+      # anyone is sent to it. A broken brain export is invisible until
+      # something asks for it.
+      - name: Deploy the revision, no traffic
+        run: |
+          gcloud run deploy "$SERVICE" \
+            --image "$REGISTRY/$SERVICE:${GITHUB_SHA}" \
+            --project "$PROJECT" --region "$REGION" \
+            --platform managed --allow-unauthenticated \
+            --port 8080 --memory 512Mi --cpu 1 \
+            --min-instances 0 --max-instances 4 \
+            --no-traffic --tag smoke
+
+      - name: Smoke the new revision
+        run: |
+          url=$(gcloud run services describe "$SERVICE" \
+            --project "$PROJECT" --region "$REGION" \
+            --format='value(status.traffic[?tag=smoke].url)' | head -n1)
+          echo "smoking $url"
+          test -n "$url"
+          curl -fsS "$url/ping" | grep -q ok
+          curl -fsS "$url/" > /dev/null
+          curl -fsS "$url/fff/" > /dev/null
+          curl -fsS "$url/brain/meta.json" | grep -q n_neurons
+          # The one that would otherwise only fail in a browser: the brain
+          # must be served whole, and gzip_static must be finding the .gz.
+          size=$(curl -fsS -o /dev/null -w '%{size_download}' "$url/brain/brain.bin")
+          echo "brain.bin: $size bytes"
+          test "$size" -gt 16000000
+
+      - name: Send traffic to it
+        run: |
+          gcloud run services update-traffic "$SERVICE" \
+            --project "$PROJECT" --region "$REGION" \
+            --to-latest --remove-tags smoke
+
+      - name: Purge the CDN
+        # Optional: the zone may not exist yet. Skips rather than fails.
+        env:
+          CF_ZONE: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CF_ZONE" ] || [ -z "$CF_TOKEN" ]; then
+            echo "no Cloudflare secrets set — skipping purge"; exit 0
+          fi
+          curl -fsS -X POST \
+            "https://api.cloudflare.com/client/v4/zones/$CF_ZONE/purge_cache" \
+            -H "Authorization: Bearer $CF_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data '{"purge_everything":true}' > /dev/null
+          echo "purged"
+
+      - name: Roll back the tag if anything above failed
+        if: failure()
+        run: |
+          gcloud run services update-traffic "$SERVICE" \
+            --project "$PROJECT" --region "$REGION" \
+            --remove-tags smoke || true

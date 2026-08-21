@@ -10,6 +10,7 @@
 import { Controller, CANVAS_W, CANVAS_H } from "../runtime/controller.js";
 import { Fff, type FffMode, type Flapper } from "../games/fff/fff.js";
 import type { FromWorker, StartMessage } from "../runtime/protocol.js";
+import { showBench } from "./bench-line.js";
 
 const view = document.getElementById("view") as HTMLCanvasElement;
 const loading = document.getElementById("loading") as HTMLDivElement;
@@ -71,8 +72,9 @@ function main(): void {
   };
   worker.postMessage(start);
 
-  showBenchmark();
+  void showBench();
   buildControls(game);
+  buildPokePanel(controller);
   explain.textContent = MODE_TEXT[game.mode];
 
   const fmt = (v: number, d = 1) => v.toFixed(d).padStart(6);
@@ -98,43 +100,32 @@ function main(): void {
 }
 
 /**
- * The benchmark's numbers, on the page.
+ * The poke panel — and the design doc is blunt that this, not the score,
+ * is the product: "QWOP with optogenetics".
  *
- * The design doc asks for this explicitly, and for a reason: the score
- * in the corner is theatre, and this is the result. Absent when the
- * benchmark has not been run — the file is a build artefact, and an
- * empty line is better than a stale one.
+ * Each button forces one real population to fire, the same channel the
+ * retina uses. Nothing about what follows is scripted: drive the giant
+ * fiber and the fly bolts because the giant fiber is wired to what it is
+ * wired to. It works mid-game, which is the point — a spectator can
+ * reach into the animal and shove the joystick.
  */
-async function showBenchmark(): Promise<void> {
-  const el = document.getElementById("bench");
-  if (!el) return;
-  try {
-    const res = await fetch("/brain/bench.json");
-    if (!res.ok) return;
-    const b = (await res.json()) as {
-      roundsPerArm: number;
-      flyBeatsPoisson: number;
-      flyBeatsNobody: number;
-      escapesOntoPlate: number;
-      startles: number;
-      arms: Record<string, { medianScore: number; scoreCI: [number, number] }>;
-    };
-    const pct = (v: number) => `${Math.round(v * 100)}%`;
-    const arm = (k: string) => {
-      const a = b.arms[k];
-      return a ? `${a.medianScore} (95% CI ${a.scoreCI[0]}-${a.scoreCI[1]})` : "—";
-    };
-    el.textContent =
-      `Measured over ${b.roundsPerArm} rounds per arm — median pipes cleared:\n` +
-      `  the fly ${arm("fly")}      a coin at the fly's own rate ${arm("poisson")}\n` +
-      `  nobody ${arm("nobody")}      a control that can see the gap ${arm("oracle")}\n` +
-      `The fly beats its rate-matched control in ${pct(b.flyBeatsPoisson)} of rounds ` +
-      `(50% is chance) and beats doing nothing in ${pct(b.flyBeatsNobody)}.\n` +
-      `It startled ${b.startles} times and ${b.escapesOntoPlate} of those ` +
-      `(${pct(b.escapesOntoPlate / Math.max(1, b.startles))}) ended on the plate: ` +
-      `most of its button presses are accidents.`;
-  } catch {
-    // No benchmark to show. Not an error worth putting on screen.
+function buildPokePanel(controller: Controller): void {
+  const bar = document.getElementById("poke");
+  if (!bar) return;
+  const buttons: readonly (readonly [string, string])[] = [
+    ["GF", "escape"],
+    ["DNa02_L", "turn left"],
+    ["DNa02_R", "turn right"],
+    ["DNp09", "forward"],
+    ["MDN", "backward"],
+    ["LC4_L", "loom, left eye"],
+    ["JO", "a swat, felt"],
+  ];
+  for (const [pop, label] of buttons) {
+    const b = document.createElement("button");
+    b.textContent = `${pop} — ${label}`;
+    b.addEventListener("click", () => controller.poke(pop, 120, 0.4));
+    bar.append(b);
   }
 }
 

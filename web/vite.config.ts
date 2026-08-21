@@ -27,6 +27,7 @@ export default defineConfig({
       input: {
         index: resolve(import.meta.dirname, "index.html"),
         fff: resolve(import.meta.dirname, "fff/index.html"),
+        bench: resolve(import.meta.dirname, "bench/index.html"),
       },
     },
   },

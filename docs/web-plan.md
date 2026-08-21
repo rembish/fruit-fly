@@ -790,6 +790,41 @@ work, and it is the padstats re-measurement Phase 2 said was owed.
 Still open: one seed only. A second would be cheap and is worth doing
 before the number goes anywhere public.
 
+### Phase 3 completed + Phase 5, 2026-08-21: the hall, the poke panel, the deploy
+
+**The cabinet hall exists** at `/`: four cabinets, two lit (Fruit Flappy
+Fly, and the fly loose on a canvas at `/bench/`) and two dark (Pong,
+Tetris) with the design doc's own reasoning on the card. The benchmark's
+numbers are on the hub as well as the cabinet, from one shared module so
+the two cannot drift into quoting different figures.
+
+**Poke mode ships with the cabinet**, which the design doc insists is
+the product rather than a debug affordance — "QWOP with optogenetics".
+Seven populations, live mid-round, verified end to end in a browser:
+clicking `GF` took the giant fiber from 5.3 Hz to 52.0 Hz and the fly
+bolted. Nothing about that is scripted; the button forces one real
+population through the same channel the retina uses.
+
+**Phase 5's deploy half is written.** `web/Dockerfile` builds the brain
+and the site in separate stages from the repository root (the connectome
+comes from the Python half, so the context has to include it) and serves
+from `nginx:alpine`. `web/nginx.conf` listens on 8080 with `/ping` — not
+`/healthz`, which the Google Front End reserves — and carries the CSP
+line the template it borrows from is missing: **`worker-src 'self'
+blob:`**, without which the page loads, shows its bar and never starts a
+fly, because `default-src` does not cover workers in every engine.
+`deploy-web.yml` fires on `web-v*` tags, re-runs the gates, asserts the
+tag matches `web/package.json`, enforces a 2 MB gzipped bundle budget on
+the non-brain code, deploys `--no-traffic --tag smoke`, curls the
+revision — including a size check on `brain.bin`, the failure that would
+otherwise only show up in someone's browser — and only then sends
+traffic, with a tag rollback on failure and an optional CDN purge that
+skips cleanly while the zone does not exist.
+
+Not done here, and deliberately: nothing has been deployed. No GCP
+resources were touched, no tag was pushed. The runbook exists and the
+first `web-v0.1.0` tag is a human decision.
+
 ## Build order
 
 Phase 0 (measurements) → 1 (brain + parity) → 2 (senses/motor/runtime)

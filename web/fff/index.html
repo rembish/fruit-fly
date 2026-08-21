@@ -53,6 +53,7 @@
       }
       #event { color: #7fc98a; min-height: 1.55em; }
       #explain { color: var(--ink); }
+      #poke { display: flex; flex-wrap: wrap; gap: 6px; width: min(960px, 100%); }
       #controls { display: flex; flex-wrap: wrap; gap: 14px; width: min(960px, 100%); }
       .group { display: flex; align-items: center; gap: 5px; }
       .group .label { color: var(--dim); margin-right: 2px; }
@@ -84,6 +85,14 @@
     <div id="event"></div>
     <div id="hud"></div>
     <div id="bench"></div>
+
+    <div id="poke"></div>
+    <p class="note">
+      The buttons drive one real population directly — the same channel the
+      eyes use. Nothing about the reaction is scripted: <code>GF</code> is
+      the giant fiber and the fly bolts because that neuron is wired to what
+      it is wired to. Reach in mid-round and shove the joystick.
+    </p>
 
     <p class="note">
       Move the pointer over the canvas to sabotage the fly — it sees you,
