@@ -740,20 +740,26 @@ backgrounded tab burning a core on a simulation nobody is watching.
 Code: `web/harness/fff-bench.ts`, `npm run bench` (`--smoke` in CI),
 output at `public/brain/bench.json`.
 
-**The fly does not play Flappy Bird.** 60 rounds per arm, one seed, a
-320-second capture of the real thing:
+**The fly does not play Flappy Bird.** 60 rounds per arm, two
+independent seeds, from 320-second captures of the real thing:
 
-| arm | median score | 95% CI | median alive | best |
-|---|---|---|---|---|
-| fly | 0 | 0–0 | 4.85 s | 1 |
-| poisson (rate-matched) | 0 | 0–0 | 4.85 s | 1 |
-| nobody | 0 | 0–0 | 4.85 s | 0 |
-| **oracle** (positive control) | **3.0** | 2–5.5 | 9.12 s | 28 |
+| arm | seed 7 median | seed 11 median | 95% CI (seed 7) |
+|---|---|---|---|
+| fly | 0 | 0 | 0–0 |
+| poisson (rate-matched) | 0 | 0 | 0–0 |
+| nobody | 0 | 0 | 0–0 |
+| **oracle** (positive control) | **3** | **6** | 2–6 |
 
-The fly beats its own rate-matched Poisson control in **50%** of matched
-rounds — indistinguishable, which is the definition of chance — and
-beats doing nothing in 53%. This is exactly the headline the design doc
-predicted and asked for, now with a number attached.
+The fly beats its own rate-matched Poisson control in **47%** and **48%**
+of matched rounds — indistinguishable, which is what chance means — and
+beats doing nothing in 51% and 50%. It replicates.
+
+The two seeds nearly did not replicate anything. Round layouts were
+seeded `SEED + r`, so seeds 7 and 11 shared **56 of their 60 pipe
+layouts** and the "second seed" re-ran 93% of the same game; the tell was
+the oracle returning byte-identical medians, CIs and bests across both.
+Multiplied by a prime instead, the oracle moves (3 against 6) and the
+fly's result stays put, which is the agreement worth having.
 
 **The positive control is the reason that sentence is worth anything.**
 Three arms all scoring zero cannot distinguish "the fly is bad at this"
