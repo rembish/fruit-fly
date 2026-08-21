@@ -340,6 +340,89 @@ In order, from `SHARED-GCP-RUNBOOK.md` / `REMBISH-DEPLOY-RUNBOOK.md`
 - Sound → JO neurons; multi-fly spectacle (the sim-clock decision
   reopened that door).
 
+## Changelog — what the phases actually measured
+
+### Phase 0, 2026-08-21: both measurements done
+
+Code: `fruitfly/experiments.py`, `python -m fruitfly phototaxis` and
+`python -m fruitfly padstats`, decision logic pinned in
+`tests/test_experiments.py` (no connectome needed, so it runs in the
+fast CI job).
+
+**M0.1 phototaxis — NULL, and cleanly.** Luminance asymmetry does not
+steer this connectome. Three brains (seeds 7/11/13), one eye at 0.85
+luminance and the other at 0.15, then mirrored, eyes only — no loom
+injection, no cursor.
+
+The design is a difference of asymmetries, not a stimulus-vs-baseline
+comparison, because the reconstruction is itself lopsided: 5,790 left
+photoreceptors against 5,361 right (8%), 54 LC4 against 50. A single
+"bright on the left" run showing more right-side drive would have
+measured that, not phototaxis. Both mirror images are run and
+`asym(bright_L) − asym(bright_R)` is the result, so any fixed structural
+bias appears in both terms and cancels. A sham pair of two identical gray
+epochs, put through the same arithmetic, gives the noise floor.
+
+| readout | window | effect | needs (1.5× sham SD) | verdict |
+|---|---|---|---|---|
+| DNa02 | transient | −0.2487 | 1.0110 | null |
+| DNa02 | sustained | +0.0032 | 0.2401 | null |
+| descending | transient | +0.0037 | 0.0279 | null |
+| descending | sustained | −0.0024 | 0.0292 | null |
+
+DNa02 is one neuron per side and its sham SD (0.67 on the transient
+window) says so — that pair alone could not have detected anything short
+of an enormous effect. The 1,305-neuron descending pool was added as the
+high-SNR corroboration and is what makes the null worth stating: it
+would have resolved a 3% lateral difference and measured 0.4%.
+
+Consequences, binding on Phase 3: **the FLAP pad cannot be a beacon.**
+No bright-pad attraction, and nothing on the site may imply the fly is
+aiming at anything. Pads get hit by drift, and layout follows M0.2's
+occupancy map — where the fly already goes — rather than where we would
+like it to look.
+
+**M0.2 pad statistics — the bottom pad works at h=20%, and every press
+is a landing.** One 120-second capture of descending drive + GF spikes
+(seed 7, blind and unthreatened, the `calibrate.py` operating point),
+replayed once through the real `MotorMap` on a 960×540 field; each
+candidate pad is then a geometry query on that one trajectory. The fly
+was landed 50% of the time at a mean speed of 165 px/s, and edge
+avoidance shapes everything: time per horizontal band, top to bottom,
+is 11.9% / 10.4% / 23.7% / 31.1% / 22.9% — the fly lives in the lower
+middle, not on the floor.
+
+Presses are edge-triggered arrivals ("inside the pad and landed or
+slow", rising edge only), swept over three definitions of slow:
+
+| pad (canvas fractions) | landed only | ≤60 px/s | ≤120 px/s |
+|---|---|---|---|
+| bottom full, h=10% | 0.0/min | 0.0 | 0.0 |
+| bottom full, h=20% | 4.0/min | 4.0 | 4.0 |
+| bottom full, h=30% | 4.5/min | 4.5 | 4.5 |
+| bottom mid-60%, h=20% | 3.5/min | 3.5 | 3.5 |
+| centre band, h=20% (control) | 2.5/min | 2.5 | 2.5 |
+
+Decisions, binding on Phase 3:
+
+- **The FLAP pad is full-width, bottom 20% of the canvas.** The
+  obvious-looking thin bar is the one that fails: at h=10% the pad got
+  zero presses in two minutes, because edge avoidance turns the fly
+  around before it reaches the floor. h=30% buys +0.5/min for half
+  again more screen — not worth it. Narrowing to the middle 60% loses
+  presses (3.5/min); full width wins.
+- **The press predicate is landed-only.** The rate is identical across
+  all three slow thresholds for every candidate: every press is a
+  landing, and the slow clause adds nothing. The web runtime pins
+  "press" to the landed state and drops the speed clause.
+- **The Poisson arm's matched rate is ≈4 presses/min** (inter-press
+  p10/50/90 = 3.2/13.8/25.8 s — read with respect, that is 8 presses).
+- **These numbers hold at 960×540 only.** The motor map's speeds and
+  its 24 px edge margin are absolute pixels; a bigger canvas means
+  proportionally less of it crossed per second and a fatter centre
+  bias. Phase 3 builds at this size or re-measures (`--canvas W H`
+  makes that one command).
+
 ## Build order
 
 Phase 0 (measurements) → 1 (brain + parity) → 2 (senses/motor/runtime)

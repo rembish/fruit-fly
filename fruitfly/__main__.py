@@ -7,6 +7,9 @@ Commands:
   fetch      download the FlyWire connectome data (~50 MB)
   prepare    compile the raw tables into data/brain.npz
   test       headless behavioral test (no window)
+  phototaxis does luminance asymmetry steer the fly? (web plan M0.1)
+  padstats   where does the fly go, and how often would it hit a pad?
+             (web plan M0.2)
 """
 
 from __future__ import annotations
@@ -29,7 +32,8 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="fruitfly", description=__doc__)
     ap.add_argument("command", nargs="?", default="run",
                     choices=["run", "fetch", "prepare", "test",
-                             "benchmark", "calibrate"])
+                             "benchmark", "calibrate",
+                             "phototaxis", "padstats"])
     ap.add_argument("--hud", action="store_true",
                     help="show neural activity HUD overlay")
     ap.add_argument("--no-vision", action="store_true",
@@ -54,6 +58,11 @@ def main(argv=None):
                          "fly may then react to its own image")
     ap.add_argument("--calib-seconds", type=float, default=120.0,
                     help="simulated seconds per trace for `calibrate`")
+    ap.add_argument("--seeds", type=int, nargs="+", default=[7, 11, 13],
+                    help="brains to run for `phototaxis`")
+    ap.add_argument("--canvas", type=int, nargs=2, default=None,
+                    metavar=("W", "H"),
+                    help="play field for `padstats` (default 960x540)")
     ap.add_argument("--seed", type=int, default=None)
     args = ap.parse_args(argv)
 
@@ -90,6 +99,30 @@ def main(argv=None):
             indptr, indices, weights, pops, dt=dt,
             seconds=args.calib_seconds, noise_rate=args.noise,
             inh_gain=args.inh)))
+        return
+
+    if args.command in ("phototaxis", "padstats"):
+        from . import experiments as ex  # noqa: PLC0415
+        dt = 2.0 if args.dt == "auto" else args.dt
+        print("[phase0] loading connectome ...")
+        indptr, indices, weights, pops, retina = data.load()
+        if args.command == "phototaxis":
+            print(f"[phase0] M0.1: {len(args.seeds)} brains x 30 "
+                  f"simulated seconds ...")
+            print(ex.format_phototaxis(ex.phototaxis(
+                indptr, indices, weights, pops, retina,
+                seeds=tuple(args.seeds), dt=dt, noise_rate=args.noise,
+                inh_gain=args.inh)))
+            return
+        print(f"[phase0] M0.2: capturing {args.calib_seconds:.0f} "
+              f"simulated seconds of descending drive ...")
+        trace = ex.capture_rates(
+            indptr, indices, weights, pops, dt=dt,
+            seconds=args.calib_seconds, noise_rate=args.noise,
+            inh_gain=args.inh, seed=7 if args.seed is None else args.seed)
+        w, h = args.canvas or ex.CANVAS
+        traj = ex.replay(trace, w, h)
+        print(ex.format_padstats(traj, ex.pad_statistics(traj)))
         return
 
     if args.command == "test":
