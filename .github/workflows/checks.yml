@@ -173,6 +173,25 @@ jobs:
         run: python -m fruitfly export-web
       - run: npm ci
         working-directory: web
-      - name: Parity gate
+      - name: Parity gate — the brain alone
         run: npm run parity
         working-directory: web
+      # The brain gate runs with no stimulus, so it cannot see a fault in
+      # the retina, the column mapping, or the way six thousand
+      # per-neuron rates reach setStimulus. This is the same comparison
+      # with the eyes open.
+      - name: Parity gate — with the eyes open
+        run: npm run sense-parity
+        working-directory: web
+      # And this is the one that catches a page which type-checks
+      # perfectly and shows nothing: it drives the real thing in a real
+      # browser and asks the fly what it is doing.
+      - name: Install a browser for the smoke test
+        run: npx playwright install --with-deps chromium
+        working-directory: web
+      - name: Smoke test in a browser
+        working-directory: web
+        run: |
+          npm run dev &
+          npx wait-on http://localhost:5173/ --timeout 60000
+          npm run smoke

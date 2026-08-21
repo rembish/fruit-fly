@@ -9,3 +9,4 @@ build/
 htmlcov/
 .pytest_cache/
 M0.results
+node_modules/

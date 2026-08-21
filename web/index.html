@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fruit Fly — Phase 2 bench</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --ink: #e8ecf1;
+        --dim: #8b95a3;
+        --line: #2a2f38;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 24px 16px 48px;
+        background: #0d0f13;
+        color: var(--ink);
+        font: 14px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+      }
+      h1 { font-size: 15px; font-weight: 600; margin: 0; letter-spacing: 0.02em; }
+      h1 span { color: var(--dim); font-weight: 400; }
+      #stage { position: relative; width: min(960px, 100%); }
+      canvas {
+        display: block;
+        width: 100%;
+        height: auto;
+        aspect-ratio: 960 / 540;
+        background: #11141a;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        cursor: crosshair;
+        touch-action: none;
+      }
+      #loading {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-content: center;
+        gap: 10px;
+        justify-items: center;
+        background: rgba(13, 15, 19, 0.92);
+        border-radius: 6px;
+        text-align: center;
+      }
+      #bar { width: 240px; height: 3px; background: var(--line); border-radius: 2px; }
+      #bar div { height: 100%; width: 0; background: #5b8dd9; border-radius: 2px; }
+      #hud, #event {
+        width: min(960px, 100%);
+        white-space: pre-wrap;
+        color: var(--dim);
+      }
+      #event { color: #7fc98a; min-height: 1.55em; }
+      #poke { display: flex; flex-wrap: wrap; gap: 6px; width: min(960px, 100%); }
+      button {
+        font: inherit;
+        color: var(--ink);
+        background: #1a1f27;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        padding: 4px 10px;
+        cursor: pointer;
+      }
+      button:hover { background: #232a34; }
+      p.note { width: min(960px, 100%); color: var(--dim); margin: 0; }
+      code { color: var(--ink); }
+    </style>
+  </head>
+  <body>
+    <h1>Fruit Fly <span>— Phase 2 bench: real connectome, real eyes, real body</span></h1>
+
+    <div id="stage">
+      <canvas id="view" width="960" height="540"></canvas>
+      <div id="loading">
+        <div>waking the fly</div>
+        <div id="bar"><div></div></div>
+        <div id="note" style="color: var(--dim)"></div>
+      </div>
+    </div>
+
+    <div id="event"></div>
+    <div id="hud"></div>
+
+    <div id="poke"></div>
+
+    <p class="note">
+      Move the pointer over the canvas — the fly sees it, with the angular
+      size a flat screen cannot supply, and treats it as a threat. Click on
+      the fly to swat: on the ground it squashes, airborne it is a glancing
+      blow. The buttons drive one real population directly; nothing about
+      the reaction is scripted.
+    </p>
+    <p class="note">
+      <code>sim</code> below 1.00x is the design working, not a bug. The
+      brain sets the pace and the whole world follows it, so a slow machine
+      shows the fly in honest slow motion with every tuned constant still
+      meaning what it meant.
+    </p>
+
+    <script type="module" src="/src/pages/bench.ts"></script>
+  </body>
+</html>

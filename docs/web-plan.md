@@ -566,6 +566,58 @@ brain and its gate, both headless. The first thing to look at is
 Phase 2 (a fly moving on a canvas) and the first thing to *play* is
 Phase 3.
 
+### Phase 2, 2026-08-21: it flies in a browser
+
+Code: `web/src/senses/`, `web/src/motor/`, `web/src/runtime/`,
+`web/index.html`, harnesses `sense-parity.ts` and `smoke.ts`.
+
+`npm run dev` and the fly is on a canvas, its body driven by 139,255
+neurons in a worker, at **0.4–0.6× realtime** on this machine. It sees
+the pointer, and it bolts from it.
+
+**The sim clock works and is visible.** The worker free-runs capped at
+1×, posts `simTimeMs`, and the body, the world and the retina cadence
+all advance by that number. The 1× cap in the worker's scheduler is the
+only comparison of simulated time to wall time anywhere in the runtime.
+The worker yields between chunks with `setTimeout` rather than looping —
+a tight loop never receives a patch message, and the symptom is a blind
+fly that reads as a retina bug.
+
+**Two gates were added that the plan did not ask for, both because
+Phase 1's gate cannot see this phase.** `sense-parity` holds both eyes
+at a fixed luminance and compares the same populations: TS 5.65 Hz
+against Python's 5.84 on a dark field, 5.70 against 5.63 on grey. Phase
+1's gate runs with *no stimulus*, so it is blind to a fault in the
+retina, the column mapping, or the way six thousand per-neuron rates
+reach `setStimulus` — and that is most of what Phase 2 added. `smoke`
+drives the real page in a headless browser and asserts on what the fly
+does. It earned its place immediately: the first run failed on a 404 for
+the entry module, which every other check passed straight through.
+
+**A finding with teeth for Phase 3: vision swings the descending pool
+hard.** Blind, it sits at 5.75 Hz; on a flat field with the eyes open,
+5.65; flying through a moving scene it ranges **3.2 to 12.2 Hz**. Every
+edge crossing the retina is a darkening transient and L1's output is
+99.6% inhibitory, so a fly with something to look at is a fly whose
+arousal is being modulated by what it sees. This is the plan's "M0.2
+must be re-measured with vision on" clause coming due with a number
+attached: `LAND_REF` is 6.3 and `TAKEOFF_REF` 8.8, and a pool that
+wanders across both of them behaves nothing like one that idles between
+them. **Phase 3 re-measures padstats against its actual scene** before
+trusting the 4 presses/minute figure.
+
+**One deviation from the layout above:** the pages live at the package
+root (`web/index.html`, later `web/fff/index.html`) rather than under
+`pages/`. Vite normalises a `../src/...` script reference away to
+`/src/...`, which 404s in dev, and the failure shows as a page stuck on
+its loading bar with a single failed request. Root-level HTML is the
+conventional Vite MPA layout and each file's URL is its path.
+
+Still Phase 3's: the Game API, pads on screen, fff itself. The pad
+*rule* is already here and tested — landed-only, edge-triggered, one
+press per arrival — because M0.2 decided it and the plan puts those
+tests in this phase.
+
 ## Build order
 
 Phase 0 (measurements) → 1 (brain + parity) → 2 (senses/motor/runtime)

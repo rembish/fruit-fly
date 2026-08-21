@@ -6,15 +6,23 @@
     "node": ">=22"
   },
   "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "parity": "tsx harness/parity.ts",
-    "check": "npm run typecheck && npm run test"
+    "check": "npm run typecheck && npm run test",
+    "smoke": "tsx harness/smoke.ts",
+    "sense-parity": "tsx harness/sense-parity.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",
+    "playwright": "^1.62.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "vite": "^7.3.6",
+    "vitest": "^3.2.7",
+    "wait-on": "^9.1.0"
   }
 }
