@@ -1,9 +1,9 @@
-"""The two measurements the web port is not allowed to guess at.
+"""The measurements the web port is not allowed to guess at.
 
-`docs/web-plan.md` Phase 0. Both are headless, both answer a question the
-layout of a game screen depends on, and both were mandated before any
-canvas exists precisely so the layout follows the fly rather than the
-other way round.
+`docs/web-plan.md` Phase 0. All headless, each answering a question the
+layout of a game screen depends on, and all mandated before any canvas
+exists precisely so the layout follows the fly rather than the other way
+round.
 
 M0.1 phototaxis — does luminance asymmetry steer this connectome? The
 loom pathway needed a scaled-down direct LC4/LPLC2 injection because the
@@ -28,10 +28,33 @@ real `MotorMap` to get one trajectory, and every candidate pad is then a
 geometry query on that trajectory. Pads do not feed back into the fly in
 v1, so one capture answers every layout question, including canvas size.
 
-Both measurements are blind and unthreatened: no retina, no cursor. That
-is the same operating point `calibrate.py` captures at, and it is the
-fly's *undisturbed* behaviour — the numbers are a floor for a fly that
-will later have pipes scrolling through its optic lobe.
+M0.1 and M0.2 are blind and unthreatened: no retina, no cursor. That is
+the same operating point `calibrate.py` captures at, and it is the fly's
+*undisturbed* behaviour — the numbers are a floor for a fly that will
+later have pipes scrolling through its optic lobe.
+
+M0.3 pipes through the eyes — is that floor all fff gets, or does the
+game world itself drive the fly? M0.1's null is the expected answer to
+the question it asked: a brightness held still for seconds is nearly a
+null stimulus for a visual system built around change. Motion is the
+trigger a real fly steers by, and the one visual behaviour this
+connectome demonstrably produces from pixels alone is escape from a
+looming edge. So the question fff actually needs answered is not "is the
+fly drawn to the pad" but "does an approaching pipe reach the giant
+fiber", and it decides a rendering choice:
+
+  A flat side-scroller translates a pipe of constant size across the
+  view. A perspective one grows it as it nears, the way `senses.py`
+  already renders the cursor. Those are different stimuli to an optic
+  lobe — the second contains expansion and the first does not — so both
+  are run, against a parked pipe (the M0.1 control, DC and expected
+  null) and a blank pair for the noise floor.
+
+M0.3 runs at `loom_injection=0.0`. The direct LC4/LPLC2 injection exists
+because the emergent loom signal was weak, so leaving it on would
+measure the safety net; the whole question is what the eyes do alone.
+The stimulus contrast is `test_retina.py`'s, unmodified, so a null
+cannot be blamed on a stimulus this brain has never been shown to answer.
 """
 
 from __future__ import annotations
@@ -42,7 +65,7 @@ import numpy as np
 
 from .brain import Brain, RateMonitor
 from .motor import LANDED, MotorMap
-from .senses import PATCH, Retina, Senses, SensoryFrame
+from .senses import EYE_RADIUS, PATCH, Retina, Senses, SensoryFrame
 
 # ---------------------------------------------------------------- M0.1
 
@@ -471,3 +494,379 @@ def format_padstats(traj: dict, stats: dict) -> str:
             lines.append(f"  {name:30s} too few presses to describe "
                          f"({s['presses']})")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------- M0.3
+
+#: The contrast `test_retina.py` drives the escape circuit with, reused
+#: rather than re-tuned: a dark object on mid gray. Borrowing a stimulus
+#: this brain is on record as answering is what makes a null here mean
+#: "the pathway does not carry this", not "nobody found the right pixels".
+WORLD_GRAY, PIPE_DARK = 0.55, 0.06
+
+#: Pipe geometry in patch pixels at scale 1.0: a wall 2x9 px wide with a
+#: 2x11 px gap in it. `SCALE_FAR -> SCALE_NEAR` is matched to the loom
+#: test's disc (radius 4 px to 48 px), so "near" fills most of the eye.
+PIPE_HALF_W, PIPE_HALF_GAP = 9.0, 11.0
+SCALE_FAR, SCALE_NEAR = 0.4, 3.2
+#: The flat renderer's pipe never changes size; it gets the midpoint.
+SCALE_FLAT = 0.5 * (SCALE_FAR + SCALE_NEAR)
+
+#: How fast a pipe crosses the eye, and this is not a free parameter. An
+#: eye sees 2*EYE_RADIUS screen pixels across PATCH patch pixels, so a
+#: side-scroller running at SCROLL_PX_S moves the pipe SCROLL_PX_S * this
+#: patch pixels per second — about 3 per sensory tick, a few pixels of
+#: travel rather than a jump. Motion pathways are tuned to a velocity
+#: range; showing them a slideshow would produce a null that says nothing
+#: about the circuit.
+SCROLL_PX_S = 150.0                        # screen px/s, typical for fff
+PATCH_PER_SCREEN = PATCH / (2.0 * EYE_RADIUS)
+#: Far enough off-centre that the pipe starts and ends fully out of sight.
+SWEEP_SPAN = PATCH + 2.0 * PIPE_HALF_W * SCALE_FLAT
+
+#: The conditions run on their own clocks, because they are different
+#: events and forcing them to share one would misrepresent both: a
+#: crossing takes as long as the pipe needs to cross, while an approach
+#: looms only at the end (perspective expansion is hyperbolic — a pipe is
+#: far away for seconds and then arrives). LOOM_S is the loom test's
+#: 0.6 s expansion with room to spare; that stimulus is on record as
+#: reaching this brain's giant fiber.
+SCROLL_S = SWEEP_SPAN / (SCROLL_PX_S * PATCH_PER_SCREEN)
+LOOM_S = 0.8
+STATIC_S = SCROLL_S            # parked as long as a crossing lasts
+
+#: What is held equal across conditions is not the length of an epoch but
+#: the number of ticks measured in it: a 0.8 s approach repeated eight
+#: times and a 2.1 s crossing repeated three both put ~128 ticks into
+#: their average, so the blank floor is built from as many samples as the
+#: condition it has to judge. Equal wall-clock with unequal sample counts
+#: would quietly make the short event the noisy one.
+TARGET_EVENT_TICKS = 128
+#: Gray between repeats, so adaptation settles and the next repeat is
+#: another event rather than more of the same one.
+GAP_S = 0.4
+
+#: Populations M0.3 reads. LC4/LPLC2 are the loom detectors the stimulus
+#: is aimed at, GF is the escape command they drive, and DNa02/descending
+#: are the steering and motor drive M0.2's trajectory was built from.
+WORLD_POPS = ["GF", "LC4_L", "LC4_R", "LPLC2_L", "LPLC2_R",
+              "DNa02_L", "DNa02_R", "descending"]
+
+#: What gets compared against the blank floor. GF is in spikes/s over the
+#: measured events (the escape command rate); the rest are rates, with
+#: the two sides averaged because M0.3 asks about drive, not sidedness —
+#: M0.1 already answered sidedness, and this stimulus arrives head-on.
+WORLD_METRICS = ["GF", "LC4", "LPLC2", "DNa02", "descending"]
+
+#: The conditions, in the order the schedule runs them.
+WORLD_CONDITIONS = ["static", "scroll", "loom"]
+
+#: A population that is essentially silent cannot be measured, and worse,
+#: it looks significant: its sham spread collapses toward zero and then
+#: any wobble clears the margin. LPLC2 sits at 0.05 Hz here — a few dozen
+#: neurons that fire almost never — and a 0.01 Hz "effect" against a
+#: 0.004 Hz floor is arithmetic, not biology. Below this blank rate a
+#: readout is reported as too quiet to judge instead, the same refusal
+#: `press_stats` makes when there are too few presses to describe. The
+#: number is a judgement call, set where a population fires less than
+#: about once per epoch.
+QUIET_HZ = 0.25
+
+
+def render_pipes(scale: float, offset: float = 0.0,
+                 gap_center: float = 0.5) -> np.ndarray:
+    """One fff pipe pair as an eye sees it: a dark wall with a gap in it.
+
+    `scale` is how near the pipe is — angular size — and `offset` how far
+    it sits off the midline, in patch pixels. Everything scales together,
+    because that is what approaching means: the wall widens and the gap's
+    edges move apart at the same time, which is the expansion the loom
+    detectors are looking for.
+    """
+    yy, xx = np.mgrid[0:PATCH, 0:PATCH]
+    cx = PATCH / 2.0 + offset
+    cy = PATCH * gap_center
+    wall = np.abs(xx - cx) <= PIPE_HALF_W * scale
+    gap = np.abs(yy - cy) <= PIPE_HALF_GAP * scale
+    return np.where(wall & ~gap, PIPE_DARK, WORLD_GRAY).astype(np.float32)
+
+
+def _gray() -> np.ndarray:
+    return np.full((PATCH, PATCH), WORLD_GRAY, dtype=np.float32)
+
+
+def _frame_at(kind: str, f: float) -> np.ndarray:
+    """One tick of a condition, `f` running 0 -> 1 across the event."""
+    if kind == "static":
+        # Parked mid-field at the flat pipe's size: the DC control, and
+        # M0.1's lesson rendered in pixels.
+        return render_pipes(SCALE_FLAT)
+    if kind == "scroll":
+        return render_pipes(SCALE_FLAT,
+                            SWEEP_SPAN * (0.5 - f))
+    if kind == "loom":
+        return render_pipes(SCALE_FAR + (SCALE_NEAR - SCALE_FAR) * f)
+    return _gray()
+
+
+def event_shape(kind: str) -> tuple[int, int]:
+    """(ticks per event, repeats) for one condition.
+
+    Repeats are chosen to bring every condition to roughly the same
+    number of measured ticks, which is what makes their averages — and
+    the blank floor's — comparably noisy.
+    """
+    seconds = {"static": STATIC_S, "scroll": SCROLL_S,
+               "loom": LOOM_S}.get(kind, SCROLL_S)
+    n_event = int(round(seconds / TICK))
+    return n_event, max(1, round(TARGET_EVENT_TICKS / n_event))
+
+
+def condition_frames(kind: str) -> tuple[list[np.ndarray], list[bool]]:
+    """One epoch: the patches, and which ticks are the event itself.
+
+    The blank epoch is gray throughout but carries a mask all the same —
+    those are the ticks it is the floor for. Gray is stationary, so which
+    ticks they are does not matter to its value, only how many there are.
+    """
+    n_event, repeats = event_shape(kind)
+    n_gap = int(round(GAP_S / TICK))
+    frames: list[np.ndarray] = []
+    is_event: list[bool] = []
+    for _ in range(repeats):
+        for i in range(n_event):
+            frames.append(_frame_at(kind, i / (n_event - 1)))
+            is_event.append(True)
+        frames += [_gray()] * n_gap
+        is_event += [False] * n_gap
+    return frames, is_event
+
+
+def _world_schedule() -> list[tuple[str, str, float]]:
+    """(label, condition kind, seconds). Rests are not measured.
+
+    The blank pair comes first and is two identical gray epochs treated
+    exactly like the three real ones — the same sham arithmetic M0.1
+    uses, so the floor is measured rather than assumed.
+    """
+    rest = ("rest", "blank", 1.2)
+    out: list[tuple[str, str, float]] = [("settle", "blank", 3.0)]
+    for label in ["blank_A", "blank_B", *WORLD_CONDITIONS]:
+        kind = "blank" if label.startswith("blank") else label
+        out += [(label, kind, 0.0), rest]
+    return out[:-1]
+
+
+def world_seconds() -> float:
+    """Simulated seconds one brain spends in M0.3, rests included."""
+    total = 0.0
+    for _, kind, seconds in _world_schedule():
+        if seconds > 0.0:
+            total += seconds
+        else:
+            n_event, repeats = event_shape(kind)
+            total += repeats * (n_event * TICK + GAP_S)
+    return total
+
+
+def _summarise(samples: dict, is_event: list[bool]) -> dict[str, float]:
+    """Per-tick traces -> the scalars conditions are compared on.
+
+    Restricted to the event ticks: the gray padding that makes every
+    epoch cost the same simulated time must not average a short, sharp
+    approach down into a long, quiet one.
+    """
+    mask = np.array(is_event, dtype=bool)
+    seconds = float(mask.sum()) * TICK
+    both = {"LC4": ("LC4_L", "LC4_R"), "LPLC2": ("LPLC2_L", "LPLC2_R"),
+            "DNa02": ("DNa02_L", "DNa02_R")}
+    out = {"GF": float(samples["GF_spikes"][mask].sum()) / seconds}
+    for name, (left, right) in both.items():
+        out[name] = float(0.5 * (samples[left][mask].mean()
+                                 + samples[right][mask].mean()))
+    out["descending"] = float(samples["descending"][mask].mean())
+    # The peak matters as much as the mean for escape: one loud tick is
+    # an escape command, and averaging it across an epoch hides it.
+    out["GF_peak"] = float(samples["GF_spikes"][mask].max()) / TICK
+    out["LC4_peak"] = float(np.maximum(samples["LC4_L"],
+                                       samples["LC4_R"])[mask].max())
+    return out
+
+
+def _run_world_epoch(brain, mon, senses, frame, patches, gf_mask):
+    """Play a patch sequence into both eyes; return per-tick traces.
+
+    Both eyes get the same image: an fff pipe arrives head-on, and the
+    desktop eye geometry puts the two eyes side by side across the
+    heading, so a wall coming straight at the fly reaches them together.
+    Laterality is therefore not manipulated here — M0.1 is the sidedness
+    experiment, this one is about whether anything arrives at all.
+    """
+    steps = int(round(TICK * 1000 / brain.dt))
+    out = {k: np.empty(len(patches), dtype=np.float32) for k in WORLD_POPS}
+    gf = np.zeros(len(patches), dtype=np.float32)
+    for i, patch in enumerate(patches):
+        frame.patch_L = patch
+        frame.patch_R = patch
+        # Cursor at infinity: the game world is the only thing in sight.
+        stim, _, _ = senses.rates(frame, 500.0, 500.0, 0.0,
+                                  brain.t / 1000.0)
+        brain.set_stimulus(stim)
+        fired = 0
+        for _ in range(steps):
+            spiked = brain.step()
+            mon.update(spiked)
+            if len(spiked):
+                fired += int(gf_mask[spiked].sum())
+        gf[i] = fired
+        for k in WORLD_POPS:
+            out[k][i] = mon.rates[k]
+    out["GF_spikes"] = gf
+    return out
+
+
+def drive_effect(runs: list[dict]) -> dict:
+    """Each condition against the blank floor, in the M0.1 discipline.
+
+    `runs` is one dict per seed, mapping epoch label -> metric -> value.
+    The effect is condition minus `blank_A`; the floor is what the same
+    subtraction gives between two epochs that differ in nothing at all.
+    An effect counts only if it clears `NULL_MARGIN` times that spread
+    *and* points the same way in every brain.
+    """
+    out: dict[str, dict] = {}
+    for cond in WORLD_CONDITIONS:
+        for metric in WORLD_METRICS:
+            real, sham, base_hz = [], [], []
+            for run in runs:
+                base = run["blank_A"][metric]
+                base_hz.append(base)
+                real.append(run[cond][metric] - base)
+                sham.append(run["blank_B"][metric] - base)
+            real_a = np.array(real, dtype=np.float64)
+            sham_a = np.array(sham, dtype=np.float64)
+            floor = float(sham_a.std(ddof=1)) if len(sham_a) > 1 else 0.0
+            effect = float(real_a.mean())
+            baseline = float(np.mean(base_hz))
+            same_sign = bool(np.all(real_a > 0) or np.all(real_a < 0))
+            quiet = baseline < QUIET_HZ
+            out[f"{cond}/{metric}"] = {
+                "effect": effect,
+                "baseline": baseline,
+                "per_seed": real_a.tolist(),
+                "sham_sd": floor,
+                "threshold": NULL_MARGIN * floor,
+                "drives": bool(not quiet and same_sign
+                               and abs(effect) > NULL_MARGIN * floor),
+                "consistent_sign": same_sign,
+                "quiet": quiet,
+            }
+    return out
+
+
+def world_drive(indptr, indices, weights, pops, retina_data, *,
+                seeds=(7, 11, 13), dt=2.0, noise_rate=100.0,
+                noise_weight=3.0, inh_gain=1.5) -> dict:
+    """M0.3: play an fff world through the eyes of several brains."""
+    runs = []
+    for seed in seeds:
+        brain = Brain(indptr, indices, weights, pops, dt=dt,
+                      noise_rate=noise_rate, noise_weight=noise_weight,
+                      inh_gain=inh_gain, seed=seed)
+        mon = RateMonitor(brain, WORLD_POPS)
+        gf_mask = np.zeros(brain.n, dtype=bool)
+        gf_mask[brain.pops["GF"]] = True
+        # Eyes only: the safety-net injection is what this experiment
+        # exists to do without.
+        senses = Senses(retina=Retina(retina_data), loom_injection=0.0)
+        frame = SensoryFrame(cursor_x=1e9, cursor_y=1e9, patch_dt=TICK)
+        run: dict[str, dict] = {}
+        for label, kind, seconds in _world_schedule():
+            if seconds > 0.0:
+                n = int(round(seconds / TICK))
+                patches, is_event = [_gray()] * n, [True] * n
+            else:
+                patches, is_event = condition_frames(kind)
+            samples = _run_world_epoch(brain, mon, senses, frame,
+                                       patches, gf_mask)
+            if label in ("rest", "settle"):
+                continue
+            run[label] = _summarise(samples, is_event)
+        runs.append(run)
+    return {"seeds": list(seeds), "dt": dt, "runs": runs,
+            "effects": drive_effect(runs)}
+
+
+def format_world(result: dict) -> str:
+    lines = [f"M0.3 pipes through the eyes — {len(result['seeds'])} seeds "
+             f"{result['seeds']}, dt={result['dt']}, "
+             f"eyes only (loom_injection=0.0)",
+             f"stimulus: an fff pipe pair, dark {PIPE_DARK} on "
+             f"{WORLD_GRAY} gray; rates are over the events only, "
+             f"~{TARGET_EVENT_TICKS} ticks of each",
+             f"  static = parked {STATIC_S:.1f}s x{event_shape('static')[1]}"
+             f" (the DC control)",
+             f"  scroll = flat renderer, crosses in {SCROLL_S:.1f}s "
+             f"x{event_shape('scroll')[1]} at {SCROLL_PX_S:.0f} screen px/s",
+             f"  loom   = perspective renderer, {SCALE_FAR}x to "
+             f"{SCALE_NEAR}x head-on in {LOOM_S:.1f}s "
+             f"x{event_shape('loom')[1]}", ""]
+    for run, seed in zip(result["runs"], result["seeds"], strict=True):
+        for label in ["blank_A", "blank_B", *WORLD_CONDITIONS]:
+            m = run[label]
+            lines.append(
+                f"seed {seed:3d} {label:8s} GF {m['GF']:5.1f} Hz "
+                f"(peak {m['GF_peak']:6.1f}) | LC4 {m['LC4']:5.1f} "
+                f"(peak {m['LC4_peak']:5.1f}) | LPLC2 {m['LPLC2']:5.1f} "
+                f"| DNa02 {m['DNa02']:5.1f} | desc {m['descending']:4.1f}")
+    lines += ["",
+              "each condition minus the blank epoch, against the spread of "
+              "blank-minus-blank (same arithmetic as M0.1):"]
+    for key, e in result["effects"].items():
+        if e["quiet"]:
+            lines.append(
+                f"  {key:20s} effect {e['effect']:+8.3f}  "
+                f"baseline {e['baseline']:6.3f} Hz -> too quiet to judge")
+            continue
+        verdict = "DRIVES" if e["drives"] else "null"
+        rel = 100.0 * e["effect"] / e["baseline"]
+        lines.append(
+            f"  {key:20s} effect {e['effect']:+8.3f} ({rel:+6.1f}%)  "
+            f"sham sd {e['sham_sd']:6.3f}  "
+            f"needs > {e['threshold']:6.3f}  -> {verdict}")
+    lines.append("")
+    lines.append(_world_verdict(result["effects"]))
+    return "\n".join(lines)
+
+
+def _world_verdict(effects: dict) -> str:
+    """The sentence the site and the plan have to live with.
+
+    Deliberately graded. The injection exists because the emergent loom
+    signal was weak, so "the eyes alone move the escape circuit a little"
+    is a real possible answer and is not the same as either a pass or a
+    null — it would mean fff rides the disclosed injection rather than
+    that no coupling exists.
+    """
+    def drove(cond):
+        return [m for m in WORLD_METRICS if effects[f"{cond}/{m}"]["drives"]]
+
+    loom, scroll = drove("loom"), drove("scroll")
+    if "GF" in loom and "GF" not in scroll:
+        return ("PASS: an approaching pipe reaches the giant fiber "
+                "through the eyes alone, and a flat one does not — fff "
+                "should render pipes with perspective, and the flap can "
+                "be a real escape")
+    if "GF" in loom and "GF" in scroll:
+        return ("PASS: pipes reach the giant fiber either way — motion "
+                "is enough and expansion is not required; fff can render "
+                "flat")
+    if loom or scroll:
+        moved = sorted(set(loom) | set(scroll))
+        return (f"PARTIAL: the world moves {', '.join(moved)} but not the "
+                f"giant fiber — the eyes alone do not command escape, so "
+                f"fff would ride the disclosed LC4/LPLC2 injection rather "
+                f"than replace it")
+    return ("NULL: an fff world through the eyes alone moves nothing "
+            "measurable — pipes are scenery, and the fly flies on drift "
+            "as M0.2 measured it")

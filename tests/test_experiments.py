@@ -201,6 +201,175 @@ def test_press_stats_survives_a_pad_nothing_touches():
     print("an untouched pad reports zero rather than dividing by it")
 
 
+# ------------------------------------------------------------------ M0.3
+
+def _dark_columns(patch):
+    """Which patch columns contain any pipe, as a boolean mask."""
+    return (patch < 0.5).any(axis=0)
+
+
+def test_a_pipe_is_a_wall_with_a_gap_in_it():
+    p = ex.render_pipes(1.0)
+    assert p.shape == (ex.PATCH, ex.PATCH)
+    mid = ex.PATCH // 2
+    assert np.isclose(p[2, mid], ex.PIPE_DARK)    # wall, top of the frame
+    assert np.isclose(p[mid, mid], ex.WORLD_GRAY)  # the gap it flies through
+    assert np.isclose(p[2, 2], ex.WORLD_GRAY)     # open sky beside the pipe
+    print(f"a pipe is {int(_dark_columns(p).sum())} dark columns "
+          f"with a gap punched through them")
+
+
+def test_approaching_expands_the_pipe_and_holds_it_centred():
+    """Looming is expansion: both edges move apart, neither drifts."""
+    near, far = ex.render_pipes(2.0), ex.render_pipes(1.0)
+    n_cols, f_cols = _dark_columns(near), _dark_columns(far)
+    assert n_cols.sum() > f_cols.sum()
+    # the far pipe's columns are a subset of the near one's: it grew
+    # around itself rather than sliding
+    assert bool((f_cols & ~n_cols).sum() == 0)
+    # ... and the gap opened up too, which a flat zoom-free pipe cannot do
+    assert (near < 0.5).sum() > 0
+    gap_near = int((near[:, ex.PATCH // 2] > 0.5).sum())
+    gap_far = int((far[:, ex.PATCH // 2] > 0.5).sum())
+    assert gap_near > gap_far, (gap_near, gap_far)
+    print(f"approach widens the wall and opens the gap "
+          f"{gap_far} -> {gap_near} px")
+
+
+def test_scrolling_moves_the_pipe_without_resizing_it():
+    """The flat renderer's pipe is the same object in a new place."""
+    left = ex.render_pipes(ex.SCALE_FLAT, offset=-20.0)
+    right = ex.render_pipes(ex.SCALE_FLAT, offset=+20.0)
+    l_cols, r_cols = _dark_columns(left), _dark_columns(right)
+    assert l_cols.sum() == r_cols.sum()           # same size ...
+    assert int(np.argmax(r_cols)) - int(np.argmax(l_cols)) == 40  # ... moved
+    print(f"a scrolled pipe keeps its {int(l_cols.sum())} columns "
+          f"and moves 40 px")
+
+
+def test_every_condition_is_measured_over_the_same_many_ticks():
+    """Not the same wall clock — the same sample count. A 0.8 s approach
+    and a 2.1 s crossing are different events, but an average over 16
+    ticks and one over 43 are differently noisy, and the blank floor has
+    to be as noisy as whatever it is judging."""
+    measured = {k: sum(ex.condition_frames(k)[1])
+                for k in [*ex.WORLD_CONDITIONS, "blank"]}
+    assert max(measured.values()) - min(measured.values()) <= 2, measured
+    assert all(n >= ex.TARGET_EVENT_TICKS - 2 for n in measured.values())
+    print(f"measured ticks per condition: {measured}")
+
+
+def test_blank_is_gray_and_static_does_not_move():
+    blank, blank_mask = ex.condition_frames("blank")
+    assert all(np.allclose(p, ex.WORLD_GRAY) for p in blank)
+    assert any(blank_mask)          # gray, but still the floor for events
+    static, _ = ex.condition_frames("static")
+    n_event = ex.event_shape("static")[0]
+    assert all(np.array_equal(static[0], p) for p in static[:n_event])
+    assert np.isclose(static[0].min(), ex.PIPE_DARK)
+    print("blank is gray throughout; the static control never moves")
+
+
+def test_the_scroll_speed_is_derived_from_the_game_not_chosen():
+    """A motion pathway is tuned to a velocity range: a pipe stepping
+    half its own width per tick is a slideshow, and a null against one
+    would say nothing about the circuit."""
+    per_tick = ex.SCROLL_PX_S * ex.PATCH_PER_SCREEN * ex.TICK
+    assert 1.5 < per_tick < 5.0, per_tick
+    assert per_tick < ex.PIPE_HALF_W * ex.SCALE_FLAT   # overlaps itself
+    print(f"a {ex.SCROLL_PX_S:.0f} px/s game moves the pipe "
+          f"{per_tick:.1f} patch px per tick")
+
+
+def test_the_schedule_measures_the_floor_before_the_conditions():
+    sched = [label for label, _, _ in ex._world_schedule()]
+    assert sched[0] == "settle"
+    for cond in ex.WORLD_CONDITIONS:
+        assert sched.index("blank_A") < sched.index(cond)
+        assert sched.index("blank_B") < sched.index(cond)
+    # rests separate every measured epoch, so adaptation starts level
+    measured = [i for i, s in enumerate(sched) if s != "rest"]
+    assert all(b - a == 2 for a, b in zip(measured[1:], measured[2:],
+                                          strict=False))
+    print(f"{ex.world_seconds():.1f} s per brain: " + " ".join(sched))
+
+
+def _world_run(gf=0.0, lc4=0.0, jitter=0.0, rng=None):
+    """One synthetic seed. `gf`/`lc4` are drive the loom condition alone
+    gets; everything else differs only by noise."""
+    rng = rng or np.random.default_rng(0)
+
+    def metrics(extra_gf, extra_lc4):
+        n = rng.normal(0, jitter, 2) if jitter else (0.0, 0.0)
+        # LPLC2 sits below QUIET_HZ on purpose: the real population does,
+        # and a readout that quiet must be refused rather than judged.
+        return {"GF": 5.0 + extra_gf + n[0], "LC4": 2.0 + extra_lc4 + n[1],
+                "LPLC2": 0.05, "DNa02": 20.0, "descending": 6.0,
+                "GF_peak": 0.0, "LC4_peak": 0.0}
+
+    return {"blank_A": metrics(0.0, 0.0), "blank_B": metrics(0.0, 0.0),
+            "static": metrics(0.0, 0.0), "scroll": metrics(0.0, 0.0),
+            "loom": metrics(gf, lc4)}
+
+
+def test_a_world_that_does_nothing_reads_null():
+    runs = [_world_run() for _ in range(3)]
+    eff = ex.drive_effect(runs)
+    assert not any(e["drives"] for e in eff.values()), eff
+    assert "NULL" in ex._world_verdict(eff)
+    print("a world the brain ignores reads null, and says pipes are scenery")
+
+
+def test_a_looming_pipe_that_fires_the_giant_fiber_reads_pass():
+    runs = [_world_run(gf=30.0, lc4=15.0) for _ in range(3)]
+    eff = ex.drive_effect(runs)
+    assert eff["loom/GF"]["drives"] and eff["loom/LC4"]["drives"]
+    assert not eff["scroll/GF"]["drives"]
+    verdict = ex._world_verdict(eff)
+    assert verdict.startswith("PASS") and "perspective" in verdict
+    print("loom-only GF drive -> render pipes with perspective")
+
+
+def test_detectors_without_escape_read_partial_not_pass():
+    """The honest middle: the injection exists because the emergent loom
+    signal is weak, so 'the eyes stir LC4 but never command escape' is a
+    real outcome and must not be reported as either success or nothing."""
+    runs = [_world_run(gf=0.0, lc4=15.0) for _ in range(3)]
+    eff = ex.drive_effect(runs)
+    assert eff["loom/LC4"]["drives"] and not eff["loom/GF"]["drives"]
+    verdict = ex._world_verdict(eff)
+    assert verdict.startswith("PARTIAL") and "injection" in verdict
+    print("LC4 without GF -> partial: fff would ride the injection")
+
+
+def test_a_silent_population_is_refused_rather_than_judged():
+    """The trap this guard exists for: a population that fires almost
+    never has almost no sham spread, so an arithmetic wobble clears the
+    margin and reads as biology. LPLC2 really does sit at ~0.05 Hz."""
+    runs = []
+    for i in range(3):
+        run = _world_run()
+        # a wobble far below anything meaningful, in one direction
+        run["loom"]["LPLC2"] = 0.05 + 0.001 * (i + 1)
+        runs.append(run)
+    eff = ex.drive_effect(runs)["loom/LPLC2"]
+    assert eff["quiet"] and not eff["drives"]
+    assert eff["consistent_sign"]          # it would have passed on sign
+    assert abs(eff["effect"]) > eff["threshold"]   # ... and on the margin
+    print(f"a {eff['effect']:+.4f} Hz wobble on a "
+          f"{eff['baseline']:.2f} Hz population is refused, not reported")
+
+
+def test_world_noise_alone_does_not_read_as_drive():
+    rng = np.random.default_rng(5)
+    runs = [_world_run(jitter=2.0, rng=rng) for _ in range(3)]
+    eff = ex.drive_effect(runs)
+    assert not eff["loom/GF"]["drives"], eff["loom/GF"]
+    assert eff["loom/GF"]["sham_sd"] > 0.0
+    print(f"jitter gives {eff['loom/GF']['effect']:+.2f} Hz against a "
+          f"{eff['loom/GF']['threshold']:.2f} threshold -> null, correctly")
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):
