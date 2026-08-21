@@ -226,11 +226,15 @@ export class Controller {
     // the runtime's, not the game's: it is the one piece of logic M0.2
     // decided and no cabinet may reinterpret it.
     if (this.game && dt > 0) {
+      this.applyBounds();
       const pressed = this.presses.poll(
         this.game.pads(),
         this.motor.st,
         CANVAS_W,
         CANVAS_H,
+        this.game.padSensor?.() ?? "sitting",
+        dt,
+        this.game.padRepeat?.() ?? 0,
       );
       this.game.tick({ dt, t, fly: this.motor.st, pressed });
     }
@@ -270,6 +274,31 @@ export class Controller {
   setGame(game: Game | null): void {
     this.game = game;
     this.presses.reset();
+    this.applyBounds();
+  }
+
+  /**
+   * Confine the fly to wherever the game keeps it.
+   *
+   * Re-read every frame rather than once, because fff switches modes
+   * live and the chamber only exists in one of them. A fly left outside
+   * its new bounds is nudged in rather than teleported: it is the same
+   * animal, and it should look like one crossing the line.
+   */
+  applyBounds(): void {
+    const frac = this.game?.flyBounds?.() ?? null;
+    const b = this.motor.bounds;
+    if (frac) {
+      b.x0 = frac[0] * CANVAS_W;
+      b.y0 = frac[1] * CANVAS_H;
+      b.x1 = frac[2] * CANVAS_W;
+      b.y1 = frac[3] * CANVAS_H;
+    } else {
+      b.x0 = 0;
+      b.y0 = 0;
+      b.x1 = CANVAS_W;
+      b.y1 = CANVAS_H;
+    }
   }
 
   hud(): Hud {

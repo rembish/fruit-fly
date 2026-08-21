@@ -664,6 +664,53 @@ whether the three arms run headless in CI with their numbers printed on
 the page (the doc asks for that; it needs padstats re-measured against
 this scene first, per Phase 2's finding).
 
+### Phase 3 addendum, 2026-08-21: the chamber, and what it cost
+
+Six corrections from watching it run, all of them things no test caught.
+
+**The fly is in a chamber now**, on the left, split across the middle:
+the lower half flaps the bird, the upper half does not. That is what an
+input device is physically. `MotorMap` grew a `bounds` rect for it.
+
+**The plate started as a ledge on the chamber floor and measured zero
+presses in 26 simulated seconds.** The desktop fly is a *top-down*
+animal — `LANDED` means feet down on the surface, and the surface is the
+whole plane, so it sits wherever it stopped. There is no gravity in the
+motor map and there never was. A ledge at the bottom is a place it never
+goes.
+
+**Edge-triggering alone is not enough here.** A single press on arrival
+threw away the entire time the fly spent standing on the plate: one flap
+per eleven seconds against a bird needing one every 0.68. The plate now
+repeats every 0.3 s while held. That is the one number chosen for
+playability rather than measured, and it is applied identically to all
+three arms, so the comparison between them is untouched.
+
+**Walls bounce instead of killing.** Almost every round was ending on
+the ground before a pipe was reached, so the game the page claims to
+measure was never being played.
+
+**The bird's runway was set by the timetable, not the flapper.** Every
+arm died at the identical second — the first pipe's arrival — until the
+pipe field grew a lead-in.
+
+**The scene control is not established.** The game is drawn where the
+retina samples, and the chamber glass was being painted *over* the pipes
+at 55% opacity, dimming the one thing the fly was meant to see; drawing
+it underneath fixed that. But the coupling still does not reproduce:
+descending drive is unmoved either way (5.74 vs 5.77 Hz), and press rate
+came out 73 vs 74 per minute in one pair of runs and 67 vs 146 in the
+next. Single short runs cannot separate that from drift. **The honest
+state is "unknown", and settling it needs the repeated headless
+comparison the design doc already asks for** — not another look.
+
+**Where it stands: the fly cannot play.** Across fly, Poisson and
+nobody, best score 0 and rounds ending on the first pipe. That is the
+doc's predicted headline arriving on schedule, but it is not yet a
+result: three single runs at one seed is an anecdote. The measurement it
+deserves is the headless three-arm comparison, and that is the next
+piece of work rather than anything on the page.
+
 ## Build order
 
 Phase 0 (measurements) → 1 (brain + parity) → 2 (senses/motor/runtime)

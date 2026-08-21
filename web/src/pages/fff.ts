@@ -22,13 +22,13 @@ const explain = document.getElementById("explain") as HTMLParagraphElement;
 
 const MODE_TEXT: Record<FffMode, string> = {
   controller:
-    "The fly is the joystick. A bird falls under gravity and flaps only when the fly lands on the FLAP pad — " +
-    "M0.2 measured that at about four arrivals a minute, which is a catastrophic rate for Flappy Bird, and that is the joke. " +
-    "The fly has no idea a game is happening.",
+    "The fly is the joystick, and has no idea a game is happening. Its chamber is split across the middle: " +
+    "while the fly is drifting through the lower half the bird flaps, and while it is in the upper half the bird falls. " +
+    "Nothing puts the fly on either side — it is a fly, and where it goes is whatever 139,255 neurons decide.",
   pilot:
-    "The fly is the bird. No pad, no proxy: the pipes come at it and its own body has to be in the gap. " +
-    "Nothing is aiming it — M0.1 showed it does not steer toward anything, so this is not a game it can win. " +
-    "It is a way of watching what a connectome does when a wall arrives.",
+    "The fly is the bird. No chamber, no proxy: the pipes come at it and its own body has to be in the gap. " +
+    "Nothing is aiming it — a bright gap does not attract this connectome, which was measured before any of this was drawn — " +
+    "so it is not a game the fly can win. It is a way of watching what a brain does when a wall arrives.",
 };
 
 function main(): void {
@@ -119,9 +119,15 @@ function buildControls(game: Fff): void {
       b.textContent = v;
       const paint = () => b.classList.toggle("on", get() === v);
       b.addEventListener("click", () => {
+        const before = game.mode;
         set(v);
-        controls.querySelectorAll("button").forEach((x) => x.dispatchEvent(new Event("repaint")));
         explain.textContent = MODE_TEXT[game.mode];
+        if (game.mode !== before) buildControls(game);
+        else {
+          controls
+            .querySelectorAll("button")
+            .forEach((x) => x.dispatchEvent(new Event("repaint")));
+        }
       });
       b.addEventListener("repaint", paint);
       paint();
@@ -147,16 +153,25 @@ function buildControls(game: Fff): void {
       },
     ),
   );
-  group(
-    "pipes in the fly's eyes",
-    toggle(
-      ["on", "off"] as const,
-      () => (game.scene ? "on" : "off"),
-      (v) => {
-        game.scene = v === "on";
-      },
-    ),
-  );
+  // Only offered in pilot mode, where the fly is among the pipes and the
+  // control does something. In controller mode the chamber sits behind
+  // the bird, so the fly only ever sees a pipe on its way out — measured
+  // at 5.83 Hz of descending drive against 5.77 with the pipes hidden
+  // from it, and 73 presses a minute against 74. A switch that changes
+  // nothing is worse than no switch: it implies a coupling that is not
+  // there.
+  if (game.mode === "pilot") {
+    group(
+      "pipes in the fly's eyes",
+      toggle(
+        ["on", "off"] as const,
+        () => (game.scene ? "on" : "off"),
+        (v) => {
+          game.scene = v === "on";
+        },
+      ),
+    );
+  }
 }
 
 main();

@@ -31,6 +31,8 @@ export interface PipeFieldOptions {
   gapH?: number;
   /** Where gaps may sit, as fractions of the height. */
   gapRange?: readonly [number, number];
+  /** Extra distance before the first pipe, so a round has a run-up. */
+  leadIn?: number;
 }
 
 /**
@@ -56,6 +58,7 @@ export class PipeField {
   readonly pipeW: number;
   readonly gapH: number;
   private readonly gapRange: readonly [number, number];
+  private readonly leadIn: number;
 
   constructor(opts: PipeFieldOptions, seed = 12345) {
     this.width = opts.width;
@@ -65,6 +68,12 @@ export class PipeField {
     this.pipeW = opts.pipeW ?? 58;
     this.gapH = opts.gapH ?? 168;
     this.gapRange = opts.gapRange ?? [0.25, 0.72];
+    // Without this the first pipe is already on screen when the round
+    // begins, and at 150 px/s it reaches the bird before the flapper has
+    // done anything — every arm, including the one nobody was flapping,
+    // died at the identical second. The round has to be decided by the
+    // flapping, not by the timetable.
+    this.leadIn = opts.leadIn ?? 340;
     this.rngState = seed >>> 0;
     this.reset();
   }
@@ -91,7 +100,7 @@ export class PipeField {
     // something on screen rather than several empty seconds.
     for (let i = 0; i < 3; i++) {
       this.pipes.push({
-        x: this.width + i * this.spacing,
+        x: this.width + this.leadIn + i * this.spacing,
         gapY: this.newGapY(),
         passed: false,
       });

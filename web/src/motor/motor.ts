@@ -79,6 +79,20 @@ export class MotorMap {
   readonly st: MotorState;
   private readonly rng: Rng;
 
+  /**
+   * Where the fly is allowed to be, in canvas pixels.
+   *
+   * Defaults to the whole canvas, which is what the desktop fly gets and
+   * what M0.2 measured against. A game may hand it a smaller chamber
+   * instead — fff's controller mode puts the fly in a box with the
+   * button as its floor, which is what "the fly is a joystick" looks
+   * like physically. Every press number M0.2 published belongs to the
+   * full canvas and does not survive that change: a fly kept near the
+   * pad presses it far more often, so a smaller box needs its own
+   * measurement rather than an assumption.
+   */
+  bounds: { x0: number; y0: number; x1: number; y1: number };
+
   private escapeUntil = 0;
   private escapeDir = 0;
   private takeoffDrive = 0;
@@ -96,6 +110,7 @@ export class MotorMap {
     seed = 4,
   ) {
     this.rng = new Rng(seed);
+    this.bounds = { x0: 0, y0: 0, x1: w, y1: h };
     this.st = {
       x: w * 0.5,
       y: h * 0.4,
@@ -139,26 +154,29 @@ export class MotorMap {
 
   private respawn(): void {
     const st = this.st;
-    const m = 30.0;
+    const b = this.bounds;
+    const m = Math.min(30.0, (b.x1 - b.x0) / 3, (b.y1 - b.y0) / 3);
+    const lo = { x: b.x0 + m, y: b.y0 + m };
+    const hi = { x: b.x1 - m, y: b.y1 - m };
     switch (this.rng.below(4)) {
       case 0:
-        st.x = m;
-        st.y = this.rng.uniform(m, this.h - m);
+        st.x = lo.x;
+        st.y = this.rng.uniform(lo.y, hi.y);
         break;
       case 1:
-        st.x = this.w - m;
-        st.y = this.rng.uniform(m, this.h - m);
+        st.x = hi.x;
+        st.y = this.rng.uniform(lo.y, hi.y);
         break;
       case 2:
-        st.x = this.rng.uniform(m, this.w - m);
-        st.y = m;
+        st.x = this.rng.uniform(lo.x, hi.x);
+        st.y = lo.y;
         break;
       default:
-        st.x = this.rng.uniform(m, this.w - m);
-        st.y = this.h - m;
+        st.x = this.rng.uniform(lo.x, hi.x);
+        st.y = hi.y;
     }
     st.heading =
-      Math.atan2(this.h / 2 - st.y, this.w / 2 - st.x) +
+      Math.atan2((b.y0 + b.y1) / 2 - st.y, (b.x0 + b.x1) / 2 - st.x) +
       this.rng.uniform(-0.5, 0.5);
     st.state = FLYING;
     st.speed = 320.0;
@@ -335,29 +353,34 @@ export class MotorMap {
       st.wingPhase += dt * 200.0 * 2 * Math.PI; // ~200 Hz wingbeat
     }
 
-    // Keep on the canvas: turn away from the edges like a fly in a bottle.
-    // The 24 px margin is absolute, which is why M0.2 pinned its numbers
-    // to a 960x540 field — on a bigger one the fly sits in the middle of
-    // a larger empty area and the pad statistics move.
-    const margin = 24.0;
+    // Keep inside the bounds: turn away from the edges like a fly in a
+    // bottle. The 24 px margin is absolute, which is why M0.2 pinned its
+    // numbers to a 960x540 field — change the field and the fly sits in
+    // a differently sized empty area, and every pad statistic moves.
+    const b = this.bounds;
+    // A chamber can be narrower than two margins; clamping to the middle
+    // then beats clamping to both walls, and stops the fly juddering
+    // between two conflicting corrections.
+    const mx = Math.min(24.0, (b.x1 - b.x0) / 2);
+    const my = Math.min(24.0, (b.y1 - b.y0) / 2);
     let bounced = false;
-    if (st.x < margin) {
-      st.x = margin;
+    if (st.x < b.x0 + mx) {
+      st.x = b.x0 + mx;
       bounced = true;
-    } else if (st.x > this.w - margin) {
-      st.x = this.w - margin;
+    } else if (st.x > b.x1 - mx) {
+      st.x = b.x1 - mx;
       bounced = true;
     }
-    if (st.y < margin) {
-      st.y = margin;
+    if (st.y < b.y0 + my) {
+      st.y = b.y0 + my;
       bounced = true;
-    } else if (st.y > this.h - margin) {
-      st.y = this.h - margin;
+    } else if (st.y > b.y1 - my) {
+      st.y = b.y1 - my;
       bounced = true;
     }
     if (bounced && st.speed > 0) {
       st.heading =
-        Math.atan2(this.h / 2 - st.y, this.w / 2 - st.x) +
+        Math.atan2((b.y0 + b.y1) / 2 - st.y, (b.x0 + b.x1) / 2 - st.x) +
         this.rng.uniform(-0.6, 0.6);
     }
 

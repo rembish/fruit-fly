@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { PipeField } from "./pipes.js";
 import { Fff } from "./fff.js";
 import { FLAP_PAD } from "../../motor/pads.js";
-import { LANDED, FLYING, type MotorState } from "../../motor/motor.js";
+import { LANDED, FLYING, MotorMap, type MotorState } from "../../motor/motor.js";
 
 const W = 960;
 const H = 540;
@@ -92,13 +92,31 @@ describe("Fff — controller mode", () => {
     expect(g.pads()[0]!.id).toBe(FLAP_PAD.id);
   });
 
-  it("falls out of the sky when nobody presses anything", () => {
+  it("skids along the floor and dies on a pipe when nobody presses", () => {
     // The do-nothing arm, and the floor every other arm has to beat.
+    // Walls bounce rather than kill, so this bird survives until the
+    // first pipe — whose gap is well above the ground it is sliding
+    // along — and scores nothing.
     const g = new Fff({ width: W, height: H, flapper: "nobody" });
-    play(g, 3.0);
+    play(g, 12.0);
     expect(g.best).toBe(0);
     expect(g.bestSurvived).toBeGreaterThan(0);
-    expect(g.bestSurvived).toBeLessThan(2.0);
+  });
+
+  it("bounces off the floor instead of dying on it", () => {
+    // The rule change that made the game measurable: almost every round
+    // used to end on the ground before a pipe was ever reached, so the
+    // thing the page claims to measure was never played.
+    const g = new Fff({ width: W, height: H, flapper: "nobody" });
+    let t = 0;
+    let sawFloor = false;
+    for (let i = 0; i < Math.round(3 / DT) && !g.over; i++) {
+      t += DT;
+      g.tick({ dt: DT, t, fly: fly(), pressed: [] });
+      if (g.birdBottom >= H - 1) sawFloor = true;
+    }
+    expect(sawFloor).toBe(true);
+    expect(g.cause).not.toContain("ground");
   });
 
   it("flies longer with presses than without", () => {
@@ -120,9 +138,8 @@ describe("Fff — controller mode", () => {
     // never "a fly plays Flappy Bird"; it was that a connectome scores
     // no better than chance, and this is why.
     const g = new Fff({ width: W, height: H, flapper: "fly", seed: 3 });
-    play(g, 12.0, (t) => Math.floor(t / 15) !== Math.floor((t - DT) / 15));
+    play(g, 20.0, (t) => Math.floor(t / 15) !== Math.floor((t - DT) / 15));
     expect(g.best).toBe(0);
-    expect(g.bestSurvived).toBeLessThan(2.0);
   });
 
   it("counts presses so the Poisson arm has a rate to match", () => {
@@ -149,13 +166,85 @@ describe("Fff — controller mode", () => {
     let rounds = 0;
     let wasOver = false;
     let t = 0;
-    for (let i = 0; i < Math.round(8 / DT); i++) {
+    for (let i = 0; i < Math.round(40 / DT); i++) {
       t += DT;
       g.tick({ dt: DT, t, fly: fly(), pressed: [] });
       if (wasOver && !g.over) rounds += 1;
       wasOver = g.over;
     }
     expect(rounds).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("the fly's chamber", () => {
+  it("keeps the fly in the box, with the button as its floor", () => {
+    const g = new Fff({ width: W, height: H });
+    const box = g.flyBounds()!;
+    const pad = g.pads()[0]!;
+    // The button spans the chamber's full width and reaches its floor,
+    // so a fly that comes down anywhere in the box lands on it.
+    expect(pad.rect[0]).toBe(box[0]);
+    expect(pad.rect[2]).toBe(box[2]);
+    expect(pad.rect[3]).toBe(box[3]);
+    expect(pad.rect[1]).toBeGreaterThan(box[1]);
+    expect(pad.rect[1]).toBeLessThan(box[3]);
+  });
+
+  it("leaves the fly the whole field in pilot mode", () => {
+    // There a chamber would be a cage, not a joystick: the fly is the
+    // player and needs the room the pipes are scrolling through.
+    const g = new Fff({ width: W, height: H, mode: "pilot" });
+    expect(g.flyBounds()).toBeNull();
+  });
+
+  it("sits clear of the bird's column, on the pipes' exit side", () => {
+    // The bird must never be inside the fly's glass, or the two read as
+    // one object. And the chamber belongs on the left: pipes enter from
+    // the right, so a chamber there would stand in front of the game and
+    // rob the bird of its runway.
+    const g = new Fff({ width: W, height: H });
+    const box = g.flyBounds()!;
+    expect(box[2] * W).toBeLessThan(560 - 13 - 20);
+    expect(box[0]).toBeLessThan(0.5);
+  });
+});
+
+describe("MotorMap in a chamber", () => {
+  it("holds a fly inside bounds far smaller than its stride", () => {
+    // The fly cruises at 260-500 px/s and escapes at 1400; the chamber
+    // is ~310 px wide. One escape dart crosses it several times over, so
+    // the clamp has to hold under a stride longer than the box.
+    const m = new MotorMap(W, H, 5);
+    const b = { x0: 0.66 * W, y0: 0.08 * H, x1: 0.985 * W, y1: 0.94 * H };
+    m.bounds = b;
+    m.st.state = FLYING;
+    m.st.speed = 1400;
+    let t = 0;
+    for (let i = 0; i < 60 * 30; i++) {
+      t += DT;
+      m.update(DT, t, { descending: 9, DNa02_L: 10, DNa02_R: 10 }, 0, 0, 0);
+      expect(m.st.x).toBeGreaterThanOrEqual(b.x0);
+      expect(m.st.x).toBeLessThanOrEqual(b.x1);
+      expect(m.st.y).toBeGreaterThanOrEqual(b.y0);
+      expect(m.st.y).toBeLessThanOrEqual(b.y1);
+    }
+  });
+
+  it("does not judder when the box is narrower than two margins", () => {
+    // Both walls want to push the fly the other way; clamping to the
+    // middle is the only stable answer, and the alternative is a fly
+    // vibrating in place.
+    const m = new MotorMap(W, H, 5);
+    m.bounds = { x0: 100, y0: 100, x1: 120, y1: 400 };
+    m.st.state = FLYING;
+    m.st.speed = 600;
+    let t = 0;
+    for (let i = 0; i < 600; i++) {
+      t += DT;
+      m.update(DT, t, { descending: 9 }, 0, 0, 0);
+      expect(m.st.x).toBeGreaterThanOrEqual(100);
+      expect(m.st.x).toBeLessThanOrEqual(120);
+    }
   });
 });
 

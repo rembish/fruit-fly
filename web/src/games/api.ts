@@ -12,7 +12,7 @@
  * realtime, which it does on most machines.
  */
 
-import type { Pad } from "../motor/pads.js";
+import type { Pad, PadSensor } from "../motor/pads.js";
 import type { MotorState } from "../motor/motor.js";
 
 /** What the runtime tells a game about the fly, once per frame. */
@@ -34,6 +34,27 @@ export interface Game {
   readonly blurb: string;
   /** Pads the runtime should watch and draw. */
   pads(): readonly Pad[];
+  /**
+   * Where the fly is allowed to be, in canvas fractions, or null for the
+   * whole field.
+   *
+   * A game may keep the fly in a chamber rather than let it roam over
+   * the playfield — which is what an input device physically is. It also
+   * invalidates every press statistic measured on the full canvas, so a
+   * game that uses this owes its own measurement.
+   */
+  flyBounds?(): readonly [number, number, number, number] | null;
+  /**
+   * How this game's pads decide they are pressed. Defaults to M0.2's
+   * rule, which is the honest one; a game may ask for the easier switch
+   * and owes an explanation on the page if it does.
+   */
+  padSensor?(): PadSensor;
+  /**
+   * Simulated seconds between repeats while a pad stays pressed, or 0
+   * for a pure edge trigger.
+   */
+  padRepeat?(): number;
   /** Fresh round. */
   reset(): void;
   tick(ctx: GameContext): void;
