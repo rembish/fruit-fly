@@ -312,6 +312,16 @@ Measured, not assumed (`python -m fruitfly phototaxis` / `padstats` /
   moves, which is the honest reason the injection above exists — the
   eyes reach the detectors, and the detectors do not reach the escape.
 
+- **It does not play Flappy Bird, and that is measured rather than
+  assumed.** A fly in a chamber presses a plate; the plate flaps a bird
+  through pipes. Over 60 rounds it beats a coin weighted to its own press
+  rate in 50% of them — indistinguishable from chance — and beats doing
+  nothing in 53%. The control that makes those numbers mean anything is a
+  fourth arm that can see the gap: it clears 3 pipes on the same pipes, so
+  the game is winnable and the fly simply does not win it. What the fly
+  *does* do is startle, and 57% of its startles end with it on the plate:
+  more than half its accidental button presses are escape reflexes.
+
 ## Tests
 
 ```bash

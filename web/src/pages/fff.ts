@@ -71,6 +71,7 @@ function main(): void {
   };
   worker.postMessage(start);
 
+  showBenchmark();
   buildControls(game);
   explain.textContent = MODE_TEXT[game.mode];
 
@@ -94,6 +95,47 @@ function main(): void {
     requestAnimationFrame(loop);
   };
   requestAnimationFrame(loop);
+}
+
+/**
+ * The benchmark's numbers, on the page.
+ *
+ * The design doc asks for this explicitly, and for a reason: the score
+ * in the corner is theatre, and this is the result. Absent when the
+ * benchmark has not been run — the file is a build artefact, and an
+ * empty line is better than a stale one.
+ */
+async function showBenchmark(): Promise<void> {
+  const el = document.getElementById("bench");
+  if (!el) return;
+  try {
+    const res = await fetch("/brain/bench.json");
+    if (!res.ok) return;
+    const b = (await res.json()) as {
+      roundsPerArm: number;
+      flyBeatsPoisson: number;
+      flyBeatsNobody: number;
+      escapesOntoPlate: number;
+      startles: number;
+      arms: Record<string, { medianScore: number; scoreCI: [number, number] }>;
+    };
+    const pct = (v: number) => `${Math.round(v * 100)}%`;
+    const arm = (k: string) => {
+      const a = b.arms[k];
+      return a ? `${a.medianScore} (95% CI ${a.scoreCI[0]}-${a.scoreCI[1]})` : "—";
+    };
+    el.textContent =
+      `Measured over ${b.roundsPerArm} rounds per arm — median pipes cleared:\n` +
+      `  the fly ${arm("fly")}      a coin at the fly's own rate ${arm("poisson")}\n` +
+      `  nobody ${arm("nobody")}      a control that can see the gap ${arm("oracle")}\n` +
+      `The fly beats its rate-matched control in ${pct(b.flyBeatsPoisson)} of rounds ` +
+      `(50% is chance) and beats doing nothing in ${pct(b.flyBeatsNobody)}.\n` +
+      `It startled ${b.startles} times and ${b.escapesOntoPlate} of those ` +
+      `(${pct(b.escapesOntoPlate / Math.max(1, b.startles))}) ended on the plate: ` +
+      `most of its button presses are accidents.`;
+  } catch {
+    // No benchmark to show. Not an error worth putting on screen.
+  }
 }
 
 function buildControls(game: Fff): void {

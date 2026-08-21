@@ -195,3 +195,15 @@ jobs:
           npm run dev &
           npx wait-on http://localhost:5173/ --timeout 60000
           npm run smoke
+      # The benchmark's short form. It carries a positive control, so a
+      # green run means "the game is winnable and here is who wins it"
+      # rather than the unreadable "everyone scored zero".
+      - name: Benchmark smoke
+        run: npm run bench -- --smoke
+        working-directory: web
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bench
+          path: web/public/brain/bench.json
+          if-no-files-found: ignore

@@ -14,9 +14,11 @@
     "parity": "tsx harness/parity.ts",
     "check": "npm run typecheck && npm run test",
     "smoke": "tsx harness/smoke.ts",
-    "sense-parity": "tsx harness/sense-parity.ts"
+    "sense-parity": "tsx harness/sense-parity.ts",
+    "bench": "tsx harness/fff-bench.ts"
   },
   "devDependencies": {
+    "@napi-rs/canvas": "^1.0.7",
     "@types/node": "^22.20.1",
     "playwright": "^1.62.1",
     "tsx": "^4.19.2",

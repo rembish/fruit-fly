@@ -735,6 +735,61 @@ accrue in the first place; measured at 0.02 s of simulated time across
 eight wall seconds hidden, against 0.40x when visible. That also stops a
 backgrounded tab burning a core on a simulation nobody is watching.
 
+### Phase 4, 2026-08-21: the benchmark, and the answer
+
+Code: `web/harness/fff-bench.ts`, `npm run bench` (`--smoke` in CI),
+output at `public/brain/bench.json`.
+
+**The fly does not play Flappy Bird.** 60 rounds per arm, one seed, a
+320-second capture of the real thing:
+
+| arm | median score | 95% CI | median alive | best |
+|---|---|---|---|---|
+| fly | 0 | 0–0 | 4.85 s | 1 |
+| poisson (rate-matched) | 0 | 0–0 | 4.85 s | 1 |
+| nobody | 0 | 0–0 | 4.85 s | 0 |
+| **oracle** (positive control) | **3.0** | 2–5.5 | 9.12 s | 28 |
+
+The fly beats its own rate-matched Poisson control in **50%** of matched
+rounds — indistinguishable, which is the definition of chance — and
+beats doing nothing in 53%. This is exactly the headline the design doc
+predicted and asked for, now with a number attached.
+
+**The positive control is the reason that sentence is worth anything.**
+Three arms all scoring zero cannot distinguish "the fly is bad at this"
+from "nobody could win this", and the game very nearly is the second: a
+flapper with a fixed repeat only sets the bird's *equilibrium height* —
+sink, hover, or pinned to the ceiling — while the gaps sit where they
+sit. An oracle that can see the next gap clears 3 pipes on the same
+pipes, so the game is winnable and the fly simply does not win it.
+Without that row this measurement would have been unreadable, and it was
+not in the plan.
+
+**Capture once, replay many.** The plan asked for ~200 rounds per arm,
+which run naively is three separate twenty-minute brain simulations. The
+pads do not feed back into the fly — pressing one flaps a bird, and the
+bird cannot touch the fly — so one long capture replays through every
+round of every arm, the same argument M0.2 made. Hours become minutes.
+The approximation it makes is recorded in the harness: the fly *sees*
+the game, and the bird's position does depend on the arm, but the bird is
+a 26 px sprite on the far side of the canvas and the pipes dominate what
+the eyes get.
+
+**The doc's emergent question, answered: yes, and often.** It asked
+whether looming pipes fire LC4 and cause accidental pad-saves. Over the
+capture the fly startled 53 times and **30 of those startles — 57% —
+ended with it on the plate.** More than half of the fly's escapes are
+accidental button presses. It is the most game-like thing the fly does,
+and it is entirely unintentional.
+
+Measured alongside: the fly presses **117 times per minute** of
+simulated time in the chamber, against M0.2's ~4 per minute on the open
+960×540 field. That is the chamber and the repeating plate doing their
+work, and it is the padstats re-measurement Phase 2 said was owed.
+
+Still open: one seed only. A second would be cheap and is worth doing
+before the number goes anywhere public.
+
 ## Build order
 
 Phase 0 (measurements) → 1 (brain + parity) → 2 (senses/motor/runtime)

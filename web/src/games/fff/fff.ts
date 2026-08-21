@@ -203,6 +203,20 @@ export class Fff implements Game {
     return this.birdY + BIRD_R;
   }
 
+  /** The bird's height. Read by the benchmark's positive control only —
+   *  no arm under test may look at this. */
+  get birdHeight(): number {
+    return this.birdY;
+  }
+
+  /** Centre of the next gap the bird has not yet cleared. */
+  get nextGapY(): number {
+    for (const p of this.field.pipes) {
+      if (!p.passed) return p.gapY;
+    }
+    return this.h / 2;
+  }
+
   get blurb(): string {
     return this.mode === "controller"
       ? "the fly lands on a pad; the pad flaps a bird"
