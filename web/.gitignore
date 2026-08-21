@@ -1,0 +1,8 @@
+node_modules/
+dist/
+
+# Build artefact, 17 MB, and CC BY-NC data besides: brain.bin is
+# produced by `python -m fruitfly export-web` from data/brain.npz, which
+# is itself downloaded rather than committed. The site serves it; git
+# does not carry it.
+public/brain/

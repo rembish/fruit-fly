@@ -12,6 +12,7 @@ Commands:
              (web plan M0.2)
   pipes      does a scrolling game world reach the escape circuit
              through the eyes alone? (web plan M0.3)
+  export-web write web/public/brain/{brain.bin,meta.json,parity.json}
 """
 
 from __future__ import annotations
@@ -41,18 +42,19 @@ def _phase0(args):
     dt = 2.0 if args.dt == "auto" else args.dt
     print("[phase0] loading connectome ...")
     indptr, indices, weights, pops, retina = data.load()
-    common = {"seeds": tuple(args.seeds), "dt": dt,
+    seeds = tuple(args.seeds or (7, 11, 13))
+    common = {"seeds": seeds, "dt": dt,
               "noise_rate": args.noise, "inh_gain": args.inh}
 
     if args.command == "phototaxis":
-        print(f"[phase0] M0.1: {len(args.seeds)} brains x 30 "
+        print(f"[phase0] M0.1: {len(seeds)} brains x 30 "
               f"simulated seconds ...")
         print(ex.format_phototaxis(ex.phototaxis(
             indptr, indices, weights, pops, retina, **common)))
         return
 
     if args.command == "pipes":
-        print(f"[phase0] M0.3: {len(args.seeds)} brains x "
+        print(f"[phase0] M0.3: {len(seeds)} brains x "
               f"{ex.world_seconds():.0f} simulated seconds, eyes only ...")
         print(ex.format_world(ex.world_drive(
             indptr, indices, weights, pops, retina, **common)))
@@ -73,7 +75,8 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="fruitfly", description=__doc__)
     ap.add_argument("command", nargs="?", default="run",
                     choices=["run", "fetch", "prepare", "test",
-                             "benchmark", "calibrate", *PHASE0])
+                             "benchmark", "calibrate", "export-web",
+                             *PHASE0])
     ap.add_argument("--hud", action="store_true",
                     help="show neural activity HUD overlay")
     ap.add_argument("--no-vision", action="store_true",
@@ -98,8 +101,17 @@ def main(argv=None):
                          "fly may then react to its own image")
     ap.add_argument("--calib-seconds", type=float, default=120.0,
                     help="simulated seconds per trace for `calibrate`")
-    ap.add_argument("--seeds", type=int, nargs="+", default=[7, 11, 13],
-                    help="brains to run for `phototaxis` and `pipes`")
+    # No shared default: the experiments want three brains and the
+    # parity reference wants five, because its job is to estimate a
+    # spread rather than a mean and three points barely have one.
+    ap.add_argument("--seeds", type=int, nargs="+", default=None,
+                    help="brains to run for `phototaxis`, `pipes` and "
+                         "`export-web` (defaults differ per command)")
+    ap.add_argument("--no-parity", dest="parity", action="store_false",
+                    help="`export-web`: write the brain, skip the slow "
+                         "parity reference")
+    ap.add_argument("--parity-seconds", type=float, default=60.0,
+                    help="bio-seconds per parity reference run")
     ap.add_argument("--canvas", type=int, nargs=2, default=None,
                     metavar=("W", "H"),
                     help="play field for `padstats` (default 960x540)")
@@ -143,6 +155,27 @@ def main(argv=None):
 
     if args.command in PHASE0:
         _phase0(args)
+        return
+
+    if args.command == "export-web":
+        from . import export_web as ew  # noqa: PLC0415
+        dt = 2.0 if args.dt == "auto" else args.dt
+        print("[export] loading connectome ...")
+        indptr, indices, weights, pops, retina = data.load()
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        seeds = tuple(args.seeds or ew.PARITY_SEEDS)
+        if args.parity:
+            print(f"[export] parity reference: {len(seeds)} seeds x "
+                  f"{args.parity_seconds:.0f} bio-s (the slow part) ...")
+        res = ew.export(root, indptr, indices, weights, pops, retina,
+                        dt=dt, parity=args.parity, seeds=seeds,
+                        seconds=args.parity_seconds,
+                        noise_rate=args.noise, inh_gain=args.inh)
+        print(f"[export] wrote {res['path']} ({res['size_mb']:.1f} MB, "
+              f"{len(res['header']['sections'])} sections)")
+        if "parity" in res:
+            print()
+            print(ew.format_parity(res["parity"]))
         return
 
     if args.command == "test":
