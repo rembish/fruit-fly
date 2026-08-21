@@ -542,9 +542,20 @@ STATIC_S = SCROLL_S            # parked as long as a crossing lasts
 #: condition it has to judge. Equal wall-clock with unequal sample counts
 #: would quietly make the short event the noisy one.
 TARGET_EVENT_TICKS = 128
-#: Gray between repeats, so adaptation settles and the next repeat is
-#: another event rather than more of the same one.
-GAP_S = 0.4
+#: Gray between repeats, long enough that adaptation actually recovers.
+#: `Retina.TAU_ADAPT` is 1.5 s, so the 0.4 s this started at gave back a
+#: quarter of the baseline and quietly made every repeat weaker than the
+#: one before — a bias toward null, which is the direction that would
+#: have been believed.
+GAP_S = 1.5
+
+#: An escape is a burst, not a level. `test_retina.py` calls the loom
+#: pathway a pass on `gf_max` over 50 ms windows, and averaging a spike
+#: at the moment of arrival across a whole approach divides it away. So
+#: each event is also scored by its loudest 200 ms — and the blank epoch
+#: is scored the same way, which is what keeps a spontaneous burst (they
+#: reach 200 Hz here unprovoked) from counting as an answer.
+BURST_TICKS = 4
 
 #: Populations M0.3 reads. LC4/LPLC2 are the loom detectors the stimulus
 #: is aimed at, GF is the escape command they drive, and DNa02/descending
@@ -556,7 +567,12 @@ WORLD_POPS = ["GF", "LC4_L", "LC4_R", "LPLC2_L", "LPLC2_R",
 #: measured events (the escape command rate); the rest are rates, with
 #: the two sides averaged because M0.3 asks about drive, not sidedness —
 #: M0.1 already answered sidedness, and this stimulus arrives head-on.
-WORLD_METRICS = ["GF", "LC4", "LPLC2", "DNa02", "descending"]
+WORLD_METRICS = ["GF", "GF_burst", "LC4", "LPLC2", "DNa02", "descending"]
+
+#: The two that decide whether the fly escapes. Everything else is
+#: context: if the detectors stir but neither of these moves, the eyes
+#: are not commanding an escape.
+ESCAPE_METRICS = ("GF", "GF_burst")
 
 #: The conditions, in the order the schedule runs them.
 WORLD_CONDITIONS = ["static", "scroll", "loom"]
@@ -622,27 +638,44 @@ def event_shape(kind: str) -> tuple[int, int]:
     return n_event, max(1, round(TARGET_EVENT_TICKS / n_event))
 
 
-def condition_frames(kind: str) -> tuple[list[np.ndarray], list[bool]]:
-    """One epoch: the patches, and which ticks are the event itself.
+def condition_frames(kind: str) -> tuple[list[np.ndarray],
+                                          list[tuple[int, int]]]:
+    """One epoch: the patches, and where each event starts and stops.
 
-    The blank epoch is gray throughout but carries a mask all the same —
-    those are the ticks it is the floor for. Gray is stationary, so which
-    ticks they are does not matter to its value, only how many there are.
+    The blank epoch is gray throughout but carries event spans all the
+    same — those are the ticks it is the floor for. Gray is stationary,
+    so where they fall does not matter to its value, only how many there
+    are and how long each one is.
     """
     n_event, repeats = event_shape(kind)
     n_gap = int(round(GAP_S / TICK))
     frames: list[np.ndarray] = []
-    is_event: list[bool] = []
+    events: list[tuple[int, int]] = []
     for _ in range(repeats):
+        start = len(frames)
         for i in range(n_event):
             frames.append(_frame_at(kind, i / (n_event - 1)))
-            is_event.append(True)
+        events.append((start, len(frames)))
         frames += [_gray()] * n_gap
-        is_event += [False] * n_gap
-    return frames, is_event
+    return frames, events
 
 
-def _world_schedule() -> list[tuple[str, str, float]]:
+def condition_order(seed_index: int) -> list[str]:
+    """Which order this brain sees the conditions in.
+
+    Rotated per brain, which M0.1 does for the same reason and this
+    experiment needs more: run in one fixed order, a slow drift in
+    excitability over a session produces a clean rising pattern across
+    conditions that is indistinguishable from a stimulus doing it. The
+    condition that always ran last would be the one that always looked
+    strongest. Rotating puts every condition in every slot.
+    """
+    r = seed_index % len(WORLD_CONDITIONS)
+    return WORLD_CONDITIONS[r:] + WORLD_CONDITIONS[:r]
+
+
+def _world_schedule(order: list[str] | None = None
+                    ) -> list[tuple[str, str, float]]:
     """(label, condition kind, seconds). Rests are not measured.
 
     The blank pair comes first and is two identical gray epochs treated
@@ -651,7 +684,7 @@ def _world_schedule() -> list[tuple[str, str, float]]:
     """
     rest = ("rest", "blank", 1.2)
     out: list[tuple[str, str, float]] = [("settle", "blank", 3.0)]
-    for label in ["blank_A", "blank_B", *WORLD_CONDITIONS]:
+    for label in ["blank_A", "blank_B", *(order or WORLD_CONDITIONS)]:
         kind = "blank" if label.startswith("blank") else label
         out += [(label, kind, 0.0), rest]
     return out[:-1]
@@ -669,27 +702,44 @@ def world_seconds() -> float:
     return total
 
 
-def _summarise(samples: dict, is_event: list[bool]) -> dict[str, float]:
+def _burst(gf: np.ndarray, events: list[tuple[int, int]]) -> float:
+    """Loudest `BURST_TICKS` of each event, averaged over the events.
+
+    Not the epoch's single maximum, which would just find the loudest
+    spontaneous moment in a long recording and grow with epoch length.
+    One number per event, then a mean: an escape that happens on every
+    approach separates from one that happened once.
+    """
+    peaks = []
+    for a, b in events:
+        seg = gf[a:b]
+        if len(seg) < BURST_TICKS:
+            peaks.append(float(seg.sum()) / (len(seg) * TICK))
+            continue
+        window = np.convolve(seg, np.ones(BURST_TICKS), mode="valid")
+        peaks.append(float(window.max()) / (BURST_TICKS * TICK))
+    return float(np.mean(peaks))
+
+
+def _summarise(samples: dict, events: list[tuple[int, int]]
+               ) -> dict[str, float]:
     """Per-tick traces -> the scalars conditions are compared on.
 
-    Restricted to the event ticks: the gray padding that makes every
-    epoch cost the same simulated time must not average a short, sharp
-    approach down into a long, quiet one.
+    Restricted to the event ticks: the gray between repeats must not
+    average a short, sharp approach down into a long, quiet one.
     """
-    mask = np.array(is_event, dtype=bool)
-    seconds = float(mask.sum()) * TICK
+    idx = np.concatenate([np.arange(a, b) for a, b in events])
+    seconds = len(idx) * TICK
     both = {"LC4": ("LC4_L", "LC4_R"), "LPLC2": ("LPLC2_L", "LPLC2_R"),
             "DNa02": ("DNa02_L", "DNa02_R")}
-    out = {"GF": float(samples["GF_spikes"][mask].sum()) / seconds}
+    out = {"GF": float(samples["GF_spikes"][idx].sum()) / seconds,
+           "GF_burst": _burst(samples["GF_spikes"], events)}
     for name, (left, right) in both.items():
-        out[name] = float(0.5 * (samples[left][mask].mean()
-                                 + samples[right][mask].mean()))
-    out["descending"] = float(samples["descending"][mask].mean())
-    # The peak matters as much as the mean for escape: one loud tick is
-    # an escape command, and averaging it across an epoch hides it.
-    out["GF_peak"] = float(samples["GF_spikes"][mask].max()) / TICK
+        out[name] = float(0.5 * (samples[left][idx].mean()
+                                 + samples[right][idx].mean()))
+    out["descending"] = float(samples["descending"][idx].mean())
     out["LC4_peak"] = float(np.maximum(samples["LC4_L"],
-                                       samples["LC4_R"])[mask].max())
+                                       samples["LC4_R"])[idx].max())
     return out
 
 
@@ -769,7 +819,8 @@ def world_drive(indptr, indices, weights, pops, retina_data, *,
                 noise_weight=3.0, inh_gain=1.5) -> dict:
     """M0.3: play an fff world through the eyes of several brains."""
     runs = []
-    for seed in seeds:
+    orders = []
+    for i, seed in enumerate(seeds):
         brain = Brain(indptr, indices, weights, pops, dt=dt,
                       noise_rate=noise_rate, noise_weight=noise_weight,
                       inh_gain=inh_gain, seed=seed)
@@ -780,21 +831,23 @@ def world_drive(indptr, indices, weights, pops, retina_data, *,
         # exists to do without.
         senses = Senses(retina=Retina(retina_data), loom_injection=0.0)
         frame = SensoryFrame(cursor_x=1e9, cursor_y=1e9, patch_dt=TICK)
+        order = condition_order(i)
+        orders.append(order)
         run: dict[str, dict] = {}
-        for label, kind, seconds in _world_schedule():
+        for label, kind, seconds in _world_schedule(order):
             if seconds > 0.0:
                 n = int(round(seconds / TICK))
-                patches, is_event = [_gray()] * n, [True] * n
+                patches, events = [_gray()] * n, [(0, n)]
             else:
-                patches, is_event = condition_frames(kind)
+                patches, events = condition_frames(kind)
             samples = _run_world_epoch(brain, mon, senses, frame,
                                        patches, gf_mask)
             if label in ("rest", "settle"):
                 continue
-            run[label] = _summarise(samples, is_event)
+            run[label] = _summarise(samples, events)
         runs.append(run)
     return {"seeds": list(seeds), "dt": dt, "runs": runs,
-            "effects": drive_effect(runs)}
+            "orders": orders, "effects": drive_effect(runs)}
 
 
 def format_world(result: dict) -> str:
@@ -811,13 +864,16 @@ def format_world(result: dict) -> str:
              f"  loom   = perspective renderer, {SCALE_FAR}x to "
              f"{SCALE_NEAR}x head-on in {LOOM_S:.1f}s "
              f"x{event_shape('loom')[1]}", ""]
-    for run, seed in zip(result["runs"], result["seeds"], strict=True):
-        for label in ["blank_A", "blank_B", *WORLD_CONDITIONS]:
+    for i, (run, seed) in enumerate(
+            zip(result["runs"], result["seeds"], strict=True)):
+        order = result.get("orders", [WORLD_CONDITIONS])[i]
+        lines.append(f"seed {seed:3d} order: {' -> '.join(order)}")
+        for label in ["blank_A", "blank_B", *order]:
             m = run[label]
             lines.append(
-                f"seed {seed:3d} {label:8s} GF {m['GF']:5.1f} Hz "
-                f"(peak {m['GF_peak']:6.1f}) | LC4 {m['LC4']:5.1f} "
-                f"(peak {m['LC4_peak']:5.1f}) | LPLC2 {m['LPLC2']:5.1f} "
+                f"    {label:8s} GF {m['GF']:5.1f} Hz "
+                f"(burst {m['GF_burst']:6.1f}) | LC4 {m['LC4']:5.2f} "
+                f"(peak {m['LC4_peak']:5.1f}) | LPLC2 {m['LPLC2']:5.2f} "
                 f"| DNa02 {m['DNa02']:5.1f} | desc {m['descending']:4.1f}")
     lines += ["",
               "each condition minus the blank epoch, against the spread of "
@@ -852,15 +908,21 @@ def _world_verdict(effects: dict) -> str:
         return [m for m in WORLD_METRICS if effects[f"{cond}/{m}"]["drives"]]
 
     loom, scroll = drove("loom"), drove("scroll")
-    if "GF" in loom and "GF" not in scroll:
+    escaped = [c for c in (loom, scroll)
+               if any(m in c for m in ESCAPE_METRICS)]
+    if len(escaped) == 1 and escaped[0] is loom:
         return ("PASS: an approaching pipe reaches the giant fiber "
                 "through the eyes alone, and a flat one does not — fff "
                 "should render pipes with perspective, and the flap can "
                 "be a real escape")
-    if "GF" in loom and "GF" in scroll:
+    if len(escaped) == 2:
         return ("PASS: pipes reach the giant fiber either way — motion "
                 "is enough and expansion is not required; fff can render "
                 "flat")
+    if escaped:
+        return ("ODD: a flat sweep commands escape and an approach does "
+                "not, which is backwards for a loom detector — treat as "
+                "a measurement fault, not a finding")
     if loom or scroll:
         moved = sorted(set(loom) | set(scroll))
         return (f"PARTIAL: the world moves {', '.join(moved)} but not the "

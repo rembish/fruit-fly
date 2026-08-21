@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np
 
 from fruitfly import experiments as ex
+from fruitfly.senses import Retina
 
 BASE = 10.0     # Hz on each side of a synthetic readout pair
 
@@ -252,7 +253,7 @@ def test_every_condition_is_measured_over_the_same_many_ticks():
     and a 2.1 s crossing are different events, but an average over 16
     ticks and one over 43 are differently noisy, and the blank floor has
     to be as noisy as whatever it is judging."""
-    measured = {k: sum(ex.condition_frames(k)[1])
+    measured = {k: sum(b - a for a, b in ex.condition_frames(k)[1])
                 for k in [*ex.WORLD_CONDITIONS, "blank"]}
     assert max(measured.values()) - min(measured.values()) <= 2, measured
     assert all(n >= ex.TARGET_EVENT_TICKS - 2 for n in measured.values())
@@ -260,9 +261,9 @@ def test_every_condition_is_measured_over_the_same_many_ticks():
 
 
 def test_blank_is_gray_and_static_does_not_move():
-    blank, blank_mask = ex.condition_frames("blank")
+    blank, blank_events = ex.condition_frames("blank")
     assert all(np.allclose(p, ex.WORLD_GRAY) for p in blank)
-    assert any(blank_mask)          # gray, but still the floor for events
+    assert blank_events        # gray, but still the floor for real events
     static, _ = ex.condition_frames("static")
     n_event = ex.event_shape("static")[0]
     assert all(np.array_equal(static[0], p) for p in static[:n_event])
@@ -303,9 +304,11 @@ def _world_run(gf=0.0, lc4=0.0, jitter=0.0, rng=None):
         n = rng.normal(0, jitter, 2) if jitter else (0.0, 0.0)
         # LPLC2 sits below QUIET_HZ on purpose: the real population does,
         # and a readout that quiet must be refused rather than judged.
-        return {"GF": 5.0 + extra_gf + n[0], "LC4": 2.0 + extra_lc4 + n[1],
+        return {"GF": 5.0 + extra_gf + n[0],
+                "GF_burst": 40.0 + 4.0 * extra_gf,
+                "LC4": 2.0 + extra_lc4 + n[1],
                 "LPLC2": 0.05, "DNa02": 20.0, "descending": 6.0,
-                "GF_peak": 0.0, "LC4_peak": 0.0}
+                "LC4_peak": 0.0}
 
     return {"blank_A": metrics(0.0, 0.0), "blank_B": metrics(0.0, 0.0),
             "static": metrics(0.0, 0.0), "scroll": metrics(0.0, 0.0),
@@ -340,6 +343,53 @@ def test_detectors_without_escape_read_partial_not_pass():
     verdict = ex._world_verdict(eff)
     assert verdict.startswith("PARTIAL") and "injection" in verdict
     print("LC4 without GF -> partial: fff would ride the injection")
+
+
+def test_conditions_do_not_always_run_in_the_same_order():
+    """The confound this rotation exists for: run one fixed order and a
+    slow drift in excitability rises across the session, which looks
+    exactly like a stimulus that gets stronger — and the condition that
+    always runs last is the one that always looks strongest."""
+    n = len(ex.WORLD_CONDITIONS)
+    orders = [ex.condition_order(i) for i in range(n)]
+    for slot in range(n):
+        assert len({o[slot] for o in orders}) == n, orders
+    for order in orders:
+        assert sorted(order) == sorted(ex.WORLD_CONDITIONS)
+    print(f"over {n} brains every condition runs in every slot: "
+          f"{[o[0] for o in orders]} lead")
+
+
+def test_a_burst_is_scored_per_event_not_per_epoch():
+    """An escape is a burst at one moment, and a mean over a whole
+    approach divides it away. But the epoch maximum is no good either —
+    it just finds the loudest spontaneous moment and grows with epoch
+    length, and blank epochs here burst to 200 Hz unprovoked."""
+    quiet = np.zeros(60, dtype=np.float32)
+    events = [(0, 20), (20, 40), (40, 60)]
+    assert ex._burst(quiet, events) == 0.0
+    # one loud tick in one event: scored, but only as one event in three
+    one = quiet.copy()
+    one[5] = 10.0
+    every = quiet.copy()
+    every[[5, 25, 45]] = 10.0
+    assert ex._burst(every, events) > ex._burst(one, events) > 0.0
+    assert abs(ex._burst(every, events) - 3 * ex._burst(one, events)) < 1e-6
+    # and a burst is found wherever in the event it happens
+    late = quiet.copy()
+    late[[18, 38, 58]] = 10.0
+    assert abs(ex._burst(late, events) - ex._burst(every, events)) < 1e-6
+    print(f"a burst on every approach reads "
+          f"{ex._burst(every, events):.0f} Hz against "
+          f"{ex._burst(one, events):.0f} for one")
+
+
+def test_the_gap_between_repeats_outlasts_adaptation():
+    """Too short a gap and every repeat is weaker than the one before,
+    which biases toward the null — the answer that would be believed."""
+    assert ex.GAP_S >= Retina.TAU_ADAPT, (ex.GAP_S, Retina.TAU_ADAPT)
+    print(f"{ex.GAP_S}s gap against a {Retina.TAU_ADAPT}s adaptation "
+          f"constant")
 
 
 def test_a_silent_population_is_refused_rather_than_judged():
