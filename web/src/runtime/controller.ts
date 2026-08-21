@@ -116,6 +116,20 @@ export class Controller {
       this.cursorY = -1e9;
     });
     view.addEventListener("pointerdown", () => this.onSwat());
+
+    // Stop the brain while the page is hidden.
+    //
+    // `requestAnimationFrame` does not run in a background tab, so the
+    // world stops advancing — but the worker keeps stepping and keeps
+    // reporting simulated time, and all of it comes due at once on the
+    // way back. Capping the backlog in SimClock stops that being
+    // *replayed* fast; this stops it accruing in the first place, which
+    // is the honest version: nobody is watching, so the fly is not
+    // living through anything. It also stops a hidden tab burning a
+    // core on a simulation with no audience.
+    document.addEventListener("visibilitychange", () => {
+      this.send({ kind: "control", running: !document.hidden });
+    });
   }
 
   private onWorker(msg: FromWorker): void {

@@ -151,7 +151,14 @@ function pass(): void {
   const sn = senses;
   if (!b || !mon || !sn) return;
   if (!running) {
-    schedule();
+    // Idle slowly rather than at setTimeout(0): a paused worker that
+    // reschedules itself immediately is a busy loop that pauses nothing.
+    // The report window restarts too, so the speed readout on the way
+    // back is not a wall-clock gap divided into zero simulated time.
+    lastReportWall = performance.now();
+    lastReportSim = b.t;
+    spikesWindow = 0;
+    setTimeout(pass, 100);
     return;
   }
 

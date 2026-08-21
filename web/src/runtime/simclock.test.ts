@@ -26,14 +26,39 @@ describe("SimClock", () => {
   });
 
   it("does not teleport the fly after a background tab", () => {
-    // A tab that was hidden comes back owing minutes. One enormous dt
-    // integrates the body straight through the canvas walls, so the
-    // excess is dropped: the fly's clock loses time, which is the right
-    // failure of the two.
+    // One enormous dt would integrate the body straight through the
+    // canvas walls.
     const c = new SimClock();
     c.advanceTo(0);
     c.advanceTo(120_000);
     expect(c.take(0.1)).toBe(0.1);
+  });
+
+  it("does not fast-forward after a background tab either", () => {
+    // The bug this exists for, and the one the test above missed by
+    // checking a single call. A hidden tab pauses requestAnimationFrame
+    // while the worker keeps producing simulated time; clamping only the
+    // step left the debt owed, and it was then handed out at 0.1 s per
+    // frame, sixty frames a second — six times realtime for as long as
+    // the tab had been away. Clamping the step is not the same as
+    // clamping the backlog.
+    const c = new SimClock();
+    c.advanceTo(0);
+    c.advanceTo(120_000); // two minutes away
+    let handedOut = 0;
+    for (let i = 0; i < 100; i++) handedOut += c.take(0.1, 0.25);
+    expect(handedOut).toBeLessThanOrEqual(0.25 + 1e-9);
+  });
+
+  it("still smooths over a dropped frame or two", () => {
+    // The backlog cap must not be so tight that ordinary jitter costs
+    // time: a couple of missed frames should be made up, not discarded.
+    const c = new SimClock();
+    c.advanceTo(0);
+    c.advanceTo(50); // ~three frames' worth arrived at once
+    let handedOut = 0;
+    for (let i = 0; i < 10; i++) handedOut += c.take(0.1, 0.25);
+    expect(handedOut).toBeCloseTo(0.05, 9);
   });
 
   it("reports simulated seconds, not wall seconds", () => {

@@ -42,12 +42,26 @@ export class SimClock {
   /**
    * Simulated seconds owed to the world since the last call.
    *
-   * Clamped, because a tab that was in the background can come back with
-   * a large debt and a single enormous dt integrates the body through
-   * walls. Dropping the excess makes the fly's clock lose time, which is
-   * the right failure: the alternative is a teleport.
+   * Two separate limits, and conflating them was a real bug. Clamping
+   * the *step* stops one enormous dt integrating the body through a
+   * wall. Clamping the *backlog* stops the debt being replayed at speed
+   * afterwards — which is what happened: a backgrounded tab pauses
+   * `requestAnimationFrame` while the worker keeps producing simulated
+   * time, and on return the old code handed out 0.1 s per frame at 60
+   * frames a second until it caught up. Six times realtime, for as long
+   * as the tab had been away. It looked like the fly had been given
+   * amphetamines.
+   *
+   * So anything past `maxBacklog` is discarded rather than owed. The
+   * fly's clock loses time, which is the right failure of the two: a
+   * viewer who looks away misses that stretch of its life, rather than
+   * watching it fast-forwarded.
    */
-  take(maxSeconds = 0.1): number {
+  take(maxSeconds = 0.1, maxBacklog = 0.25): number {
+    const capMs = maxBacklog * 1000;
+    if (this.simMs - this.consumedMs > capMs) {
+      this.consumedMs = this.simMs - capMs;
+    }
     const owed = (this.simMs - this.consumedMs) / 1000;
     if (owed <= 0) return 0;
     const dt = Math.min(owed, maxSeconds);

@@ -711,6 +711,30 @@ result: three single runs at one seed is an anecdote. The measurement it
 deserves is the headless three-arm comparison, and that is the next
 piece of work rather than anything on the page.
 
+### Phase 3 fix, 2026-08-21: the background-tab fast-forward
+
+Reported from a real browser: leave the tab in the background, come
+back, and the game runs "extra boosted". It was a bug, and a good
+demonstration that clamping a step is not the same as clamping a debt.
+
+`requestAnimationFrame` does not run in a hidden tab, so the world stops
+advancing while the worker keeps producing simulated time. `SimClock`
+capped the per-frame `dt` at 0.1 s — which is what stops one enormous
+step integrating the body through a wall — but left the rest of the debt
+*owed*. On return it was handed out 0.1 s per frame at sixty frames a
+second: **six times realtime, for as long as the tab had been away.**
+The doc comment claimed the excess was dropped; the code never dropped
+it, and the test only checked a single call, so nothing caught it.
+
+Two fixes. The backlog is now capped as well as the step, so anything
+past 0.25 s is discarded rather than replayed — the fly's clock loses
+time, which is the right failure: a viewer who looks away misses that
+stretch of its life rather than watching it fast-forwarded. And the
+worker is paused outright on `visibilitychange`, so the debt does not
+accrue in the first place; measured at 0.02 s of simulated time across
+eight wall seconds hidden, against 0.40x when visible. That also stops a
+backgrounded tab burning a core on a simulation nobody is watching.
+
 ## Build order
 
 Phase 0 (measurements) → 1 (brain + parity) → 2 (senses/motor/runtime)
