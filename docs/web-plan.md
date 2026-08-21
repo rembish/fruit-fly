@@ -338,7 +338,13 @@ In order, from `SHARED-GCP-RUNBOOK.md` / `REMBISH-DEPLOY-RUNBOOK.md`
   Each is a `Game` implementation + a lit cabinet in the hall; the
   runtime does not change.
 - Sound → JO neurons; multi-fly spectacle (the sim-clock decision
-  reopened that door).
+  reopened that door). A gusty breeze belongs on the same shelf: wind
+  is sensed by the same organ (Johnston's, antennal deflection), so it
+  is the same injection machinery. Gusts, not a constant flow — this
+  brain responds to events, not conditions, and anything steady adapts
+  away within seconds (the M0.1 lesson). Expect startle texture, not
+  anemotaxis: wind-following in real flies is odor/state-gated through
+  central-complex machinery this LIF does not sustain.
 
 ## Changelog — what the phases actually measured
 
@@ -422,6 +428,33 @@ Decisions, binding on Phase 3:
   proportionally less of it crossed per second and a fatter centre
   bias. Phase 3 builds at this size or re-measures (`--canvas W H`
   makes that one command).
+
+**Proposed, not yet run — M0.3, pipes through the eyes.** The M0.1
+null is the biologically expected answer to the question asked: a
+static DC brightness held for seconds is close to a null stimulus for
+a visual system built around change, and real phototaxis is largely a
+startle-gated escape behavior in a fly we deliberately left calm. The
+trigger a real fly steers by is *motion* — and unlike static
+luminance, moving contrast is what our sensory layer models best (the
+transient pathway), and an approaching pipe edge is a looming
+stimulus, the one visual motion behavior this connectome demonstrably
+produces (LC4/LPLC2 → GF, verified through the eyes in
+`test_retina.py`). So the open design question for fff: feed the
+scrolling game world into the retina and let *pipe looms → startle →
+flap* be a real coupling. That is not aiming, so it does not violate
+M0.1's clause — but it is the fly genuinely reacting to the game.
+Expect startle, not optomotor flight control: T4/T5 correlator
+function lives in tens-of-ms delay structure in graded medulla neurons
+and is likely degraded at dt=2 ms with 50 ms sensory ticks. M0.3 is
+the same harness as M0.1 with scrolling bars instead of static
+luminance, measuring GF/DNa02/descending vs a static control. If it
+passes and Phase 3 adopts it, **M0.2 must be re-measured with vision
+on**: the current press statistics are explicitly the blind,
+unthreatened floor, and startle darts at 1400 px/s change both the
+occupancy map and the landed-only press rate. (A side-view canvas by
+itself changes nothing: the brain has no gravity sense and the motor
+map no concept of up — the lever is world motion, which any view can
+render.)
 
 ## Build order
 
