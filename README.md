@@ -284,7 +284,8 @@ Approximated, and why:
   brain. A chimera of two flies is not the complete real brain of a fruit
   fly, so the invented motor map stays.
 
-Measured, not assumed (`python -m fruitfly phototaxis` / `padstats`):
+Measured, not assumed (`python -m fruitfly phototaxis` / `padstats` /
+`pipes`):
 
 - **Luminance asymmetry does not steer this connectome.** One eye bright,
   one dim, mirrored so the reconstruction's own lopsidedness (5,790 left
@@ -299,6 +300,17 @@ Measured, not assumed (`python -m fruitfly phototaxis` / `padstats`):
   pad on the bottom 20% gets hit ~4 times a minute — every hit a
   landing, never a slow flyover — while a thin 10% bar is never hit at
   all, because the fly turns back before it reaches the floor.
+
+- **The loom detectors are selective, and the signal dies after them.**
+  Six brains shown a dark obstacle through the eyes alone, with the
+  LC4/LPLC2 injection switched off. An obstacle that *approaches* — one
+  that grows the way a real one does — raises LC4 by 54%, in every
+  brain. The same obstacle sliding past at constant size does not clear
+  the noise, and one sitting still does nothing whatsoever. That
+  selectivity is the real wiring's, not ours: nothing in the sensory
+  layer knows what looming is. But the giant fiber downstream never
+  moves, which is the honest reason the injection above exists — the
+  eyes reach the detectors, and the detectors do not reach the escape.
 
 ## Tests
 
@@ -325,7 +337,7 @@ python3 tests/test_behavior.py 0.5 # ... at a different timestep
 python3 tests/test_retina.py       # retinotopy, and looming through the eyes
 ```
 
-Coverage is **51%** (`coverage run --source=fruitfly -m pytest`). Most of
+Coverage is **52%** (`coverage run --source=fruitfly -m pytest`). Most of
 the remainder is code that cannot run headless on one machine: the three
 window backends, `app.py` and `__main__.py`, which exist to wire the fly
 to a screen, and the fetch/compile half of `data.py`. The parts that
@@ -347,10 +359,10 @@ fruitfly/ui/cocoa.py  macOS backend
 fruitfly/ui/win32.py  Windows backend (ctypes, no dependency)
 fruitfly/bench.py     what timestep this machine can actually sustain
 fruitfly/calibrate.py re-derives the motor thresholds when the brain changes
-fruitfly/experiments.py the web plan's Phase 0 measurements (phototaxis, padstats)
+fruitfly/experiments.py Phase 0 measurements (phototaxis, padstats, pipes)
 fruitfly/app.py       wires brain + senses + backend together
 fruitfly/__main__.py  the CLI: run, benchmark, calibrate, fetch, prepare,
-                      test, phototaxis, padstats
+                      test, phototaxis, padstats, pipes
 tests/                backend contract, circuit, retina, closed-loop, tuning
 ```
 

@@ -348,7 +348,7 @@ In order, from `SHARED-GCP-RUNBOOK.md` / `REMBISH-DEPLOY-RUNBOOK.md`
 
 ## Changelog — what the phases actually measured
 
-### Phase 0, 2026-08-21: both measurements done
+### Phase 0, 2026-08-21: both mandated measurements done
 
 Code: `fruitfly/experiments.py`, `python -m fruitfly phototaxis` and
 `python -m fruitfly padstats`, decision logic pinned in
@@ -429,32 +429,82 @@ Decisions, binding on Phase 3:
   bias. Phase 3 builds at this size or re-measures (`--canvas W H`
   makes that one command).
 
-**Proposed, not yet run — M0.3, pipes through the eyes.** The M0.1
-null is the biologically expected answer to the question asked: a
-static DC brightness held for seconds is close to a null stimulus for
-a visual system built around change, and real phototaxis is largely a
-startle-gated escape behavior in a fly we deliberately left calm. The
-trigger a real fly steers by is *motion* — and unlike static
-luminance, moving contrast is what our sensory layer models best (the
-transient pathway), and an approaching pipe edge is a looming
-stimulus, the one visual motion behavior this connectome demonstrably
-produces (LC4/LPLC2 → GF, verified through the eyes in
-`test_retina.py`). So the open design question for fff: feed the
-scrolling game world into the retina and let *pipe looms → startle →
-flap* be a real coupling. That is not aiming, so it does not violate
-M0.1's clause — but it is the fly genuinely reacting to the game.
-Expect startle, not optomotor flight control: T4/T5 correlator
-function lives in tens-of-ms delay structure in graded medulla neurons
-and is likely degraded at dt=2 ms with 50 ms sensory ticks. M0.3 is
-the same harness as M0.1 with scrolling bars instead of static
-luminance, measuring GF/DNa02/descending vs a static control. If it
-passes and Phase 3 adopts it, **M0.2 must be re-measured with vision
-on**: the current press statistics are explicitly the blind,
-unthreatened floor, and startle darts at 1400 px/s change both the
-occupancy map and the landed-only press rate. (A side-view canvas by
-itself changes nothing: the brain has no gravity sense and the motor
-map no concept of up — the lever is world motion, which any view can
-render.)
+### Phase 0 addendum, 2026-08-21: M0.3, pipes through the eyes
+
+Code: `python -m fruitfly pipes`, decision logic in
+`tests/test_experiments.py` alongside the other two.
+
+M0.1's null is the biologically expected answer to the question it
+asked — a brightness held still for seconds is nearly a null stimulus
+for a visual system built around change. The trigger a real fly uses
+is *motion*, and the one visual behaviour this connectome produces
+from pixels alone is escape from a looming edge. So the question fff
+actually needs is not "is the fly drawn to the pad" but "does an
+approaching pipe reach the giant fiber" — which decides a rendering
+choice, because a flat side-scroller translates a pipe of constant
+size while a perspective one grows it, and those are different stimuli
+to an optic lobe.
+
+Six brains, eyes only (`loom_injection=0.0` — the direct LC4/LPLC2
+injection exists to paper over a weak emergent signal, and leaving it
+on would have measured the safety net). A real pipe pair, dark wall
+with a gap, at `test_retina.py`'s contrast. Four conditions against a
+blank pair for the floor: **static** (parked — M0.1's control in
+pixels), **scroll** (flat renderer, crossing at 150 screen px/s),
+**loom** (perspective, growing 0.4× → 3.2× head-on).
+
+| condition | LC4 | giant fiber (rate) | GF burst | descending |
+|---|---|---|---|---|
+| static | −3.0% → null | +4.4% → null | −3.2% → null | +0.3% → null |
+| scroll | +9.7% → null | +4.4% → null | −6.4% → null | −0.6% → null |
+| loom | **+53.7% → drives** | +16.3% → null | +9.1% → null | +1.0% → null |
+
+**The loom detectors see the pipe, and nothing downstream does.** LC4
+rises from ~0.47 Hz at blank to 0.69–0.82 Hz on an approach in *every
+one of six brains*, and the selectivity is textbook: expansion drives
+it, a flat sweep of the same pipe does not clear the bar, a parked
+pipe does nothing at all. That is a loom detector behaving like a loom
+detector, out of the real wiring, from pixels alone. But the giant
+fiber never moves — +16.3% against a bar of 2.4 Hz it misses, and the
+per-approach burst statistic misses too — and neither does descending
+drive. The eyes alone do not command an escape.
+
+Consequences, binding on Phase 3:
+
+- **Render pipes with perspective.** Expansion is the only thing that
+  moves the visual circuit at all; a flat sweep is, to this optic
+  lobe, nearly the same as a parked pipe.
+- **The flap cannot be a pure-retina escape.** fff rides the disclosed
+  LC4/LPLC2 injection to turn an approach into a startle, exactly as
+  the desktop fly does with the cursor. That is a real coupling and an
+  honest one *provided the site says so* — the Science Notes already
+  disclose the injection, and the fff page must not claim the fly
+  escapes pipes it can only half-see.
+- **If Phase 3 wires vision in, M0.2 must be re-measured.** Its press
+  statistics are explicitly the blind, unthreatened floor; startle
+  darts at 1400 px/s cross a pad without landing, and the press
+  predicate is landed-only.
+- A side-view canvas changes nothing by itself: the brain has no
+  gravity sense and the motor map no concept of up. The lever is world
+  motion, which any camera angle can render.
+
+Two honesty notes. An earlier fixed-order pilot had the flat scroll
+clearing the bar at +11.8%, where this run reads +9.7% and null — but
+the credit does not go to counterbalancing specifically. The effect
+itself barely moved (0.055 → 0.046 Hz); what changed the verdict is
+that the bar doubled (0.049 → 0.095), because the noise floor was
+re-measured with six brains and with gaps long enough for adaptation
+to recover. Rotation, seed count and gap length all changed in the
+same rerun, so which of them mattered cannot be separated here. What
+can be said is that the scroll effect was never robust and the loom
+effect survived every version of the design. Second: the blanks always
+run first, so a global drift would inflate every condition equally and
+rotation cannot remove that — **static is the sentinel**, and it stays
+null, so drift is not the story.
+
+LPLC2 is reported as too quiet to judge throughout. It sits near
+0.05 Hz, its sham spread collapses to 0.004, and at that point
+arithmetic clears any margin and reads as biology.
 
 ## Build order
 
