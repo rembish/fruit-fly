@@ -360,9 +360,12 @@ fruitfly/ui/win32.py  Windows backend (ctypes, no dependency)
 fruitfly/bench.py     what timestep this machine can actually sustain
 fruitfly/calibrate.py re-derives the motor thresholds when the brain changes
 fruitfly/experiments.py Phase 0 measurements (phototaxis, padstats, pipes)
+fruitfly/export_web.py  brain.bin + the parity reference for the web port
 fruitfly/app.py       wires brain + senses + backend together
 fruitfly/__main__.py  the CLI: run, benchmark, calibrate, fetch, prepare,
-                      test, phototaxis, padstats, pipes
+                      test, phototaxis, padstats, pipes, export-web
+web/                  the browser port: the same brain in TypeScript,
+                      held to the Python one by a measured parity gate
 tests/                backend contract, circuit, retina, closed-loop, tuning
 ```
 

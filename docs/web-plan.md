@@ -506,6 +506,66 @@ LPLC2 is reported as too quiet to judge throughout. It sits near
 0.05 Hz, its sham spread collapses to 0.004, and at that point
 arithmetic clears any margin and reads as biology.
 
+### Phase 1, 2026-08-21: export, port, parity gate green
+
+Code: `python -m fruitfly export-web`, `web/src/brain/`,
+`web/harness/parity.ts`, CI jobs `web` and `parity`.
+
+**brain.bin is 17.1 MB in 48 sections** — a magic, a JSON directory,
+then the raw little-endian arrays, each on an 8-byte boundary so the
+browser can build TypedArray views on the download without copying. All
+three narrowings hold with room: 2.7 M connections against int32's
+2.1 G, and weights are whole synapse counts in [−2405, 1897] against
+int16's 32,767. The export refuses a fraction or an overflow rather
+than wrapping one, and reads its own output back before claiming to
+have written it. Retina arrays ship now, so Phase 2 needs no format
+bump.
+
+**The port passes on the first run.** Five seeds, 60 bio-seconds each,
+resting network, no stimulus:
+
+| readout | TS | Python | tolerance | |
+|---|---|---|---|---|
+| network Hz/neuron | 1.5908 | 1.5907 | 0.0137 | ok |
+| descending (1305) | 5.7813 | 5.7523 | 0.0373 | ok |
+| central (32381) | 5.0795 | 5.0781 | 0.0544 | ok |
+| DNa02_L (1) | 24.343 | 24.357 | 0.825 | ok |
+| GF (2) | 3.360 | 3.143 | 0.568 | ok |
+| LC4 (104) | 0.0707 | 0.0740 | 0.0118 | ok |
+
+The PSP calibration — the one constant both runtimes derive rather than
+read — agrees to zero at printed precision, not merely to the 1e-6 the
+plan asked for. `descending` is the tightest pass (0.029 against 0.037)
+and is the row to watch if the port is touched again.
+
+**Two corrections to this plan, both measured.** The tolerance
+procedure said "run the Python reference twice"; a spread from one
+degree of freedom can come out near zero by luck, and GF is two
+neurons. Five seeds, and the gate treats a zero-spread readout as
+unpoliceable rather than as infinitely strict — otherwise it is a bar
+no implementation clears, including the one that set it. And the plan
+asserted the network sits at the homeostat's 1.0 ± 0.2 Hz. It does
+not: it sits at **1.59 with the governor emptied to 0.00 Hz**. The
+governor's only lever is *adding* noise, and this network is livelier
+than its target on recurrence alone, so the loop bottoms out within ten
+simulated seconds and has nothing left to do. It prevents coma; it
+cannot prevent liveliness. Gating on the target would have failed a
+correct port for disagreeing with an incorrect expectation, so the gate
+compares the port to the measurement — and compares the governor's own
+resting value too, since two runtimes whose rates matched while their
+governors sat elsewhere would be agreeing by luck.
+
+**PERF, recorded and not gated: 339 steps/s in Node, 0.68× realtime at
+dt=2** on the development machine. Under realtime, single-threaded,
+before any browser is involved. Phase 4 owns this, but the number says
+now that the sim-clock decision — the worker free-runs and the game
+advances by simulated ms — is load-bearing rather than decorative.
+
+Nothing here is visible in a browser yet, by design: Phase 1 is the
+brain and its gate, both headless. The first thing to look at is
+Phase 2 (a fly moving on a canvas) and the first thing to *play* is
+Phase 3.
+
 ## Build order
 
 Phase 0 (measurements) → 1 (brain + parity) → 2 (senses/motor/runtime)
