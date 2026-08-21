@@ -300,19 +300,32 @@ def _world_run(gf=0.0, lc4=0.0, jitter=0.0, rng=None):
     gets; everything else differs only by noise."""
     rng = rng or np.random.default_rng(0)
 
-    def metrics(extra_gf, extra_lc4):
+    # Each condition's event shape gives its burst maximum a different
+    # number of chances, so an unstimulated brain reads a different burst
+    # per condition. The fixture models that, because a floor that
+    # ignored it is the bug `_blank_bursts` exists to prevent.
+    def shape_floor(cond):
+        return 40.0 + 3.0 * ex.WORLD_CONDITIONS.index(cond)
+
+    def metrics(cond, extra_gf=0.0, extra_lc4=0.0):
         n = rng.normal(0, jitter, 2) if jitter else (0.0, 0.0)
         # LPLC2 sits below QUIET_HZ on purpose: the real population does,
         # and a readout that quiet must be refused rather than judged.
         return {"GF": 5.0 + extra_gf + n[0],
-                "GF_burst": 40.0 + 4.0 * extra_gf,
+                "GF_burst": shape_floor(cond) + 4.0 * extra_gf,
                 "LC4": 2.0 + extra_lc4 + n[1],
                 "LPLC2": 0.05, "DNa02": 20.0, "descending": 6.0,
                 "LC4_peak": 0.0}
 
-    return {"blank_A": metrics(0.0, 0.0), "blank_B": metrics(0.0, 0.0),
-            "static": metrics(0.0, 0.0), "scroll": metrics(0.0, 0.0),
-            "loom": metrics(gf, lc4)}
+    def blank():
+        m = metrics("static")
+        for cond in ex.WORLD_CONDITIONS:
+            m[f"GF_burst@{cond}"] = shape_floor(cond)
+        return m
+
+    return {"blank_A": blank(), "blank_B": blank(),
+            "static": metrics("static"), "scroll": metrics("scroll"),
+            "loom": metrics("loom", gf, lc4)}
 
 
 def test_a_world_that_does_nothing_reads_null():
@@ -390,6 +403,38 @@ def test_the_gap_between_repeats_outlasts_adaptation():
     assert ex.GAP_S >= Retina.TAU_ADAPT, (ex.GAP_S, Retina.TAU_ADAPT)
     print(f"{ex.GAP_S}s gap against a {Retina.TAU_ADAPT}s adaptation "
           f"constant")
+
+
+def test_the_burst_floor_is_measured_per_condition_shape():
+    """A maximum over 40 windows beats one over 13 under the identical
+    null, so one blank burst number would be a floor too high for the
+    short events and too low for the long ones — and being systematic,
+    every brain would shift the same way and agreeing on sign would
+    prove nothing."""
+    gf = np.zeros(200, dtype=np.float32)
+    rng = np.random.default_rng(3)
+    gf[:] = rng.integers(0, 3, size=200)      # pure noise, no stimulus
+    floors = ex._blank_bursts(gf)
+    assert set(floors) == {f"GF_burst@{c}" for c in ex.WORLD_CONDITIONS}
+    long_ev, short_ev = floors["GF_burst@scroll"], floors["GF_burst@loom"]
+    assert long_ev > short_ev, floors
+    print(f"on noise alone, scroll-shaped events read "
+          f"{long_ev:.0f} Hz and loom-shaped {short_ev:.0f} Hz — "
+          f"which is why they get separate floors")
+
+
+def test_a_suppressed_burst_is_never_a_pass():
+    """Escape is more giant fiber, never less. A shape artefact that
+    lowered bursts during approaches must not print a pass."""
+    runs = [_world_run() for _ in range(3)]
+    for run in runs:
+        run["loom"]["GF_burst"] = run["blank_A"]["GF_burst@loom"] - 12.0
+    eff = ex.drive_effect(runs)["loom/GF_burst"]
+    assert eff["drives"] and eff["effect"] < 0      # it does clear the bar
+    verdict = ex._world_verdict(ex.drive_effect(runs))
+    assert not verdict.startswith("PASS"), verdict
+    print(f"a {eff['effect']:+.0f} Hz burst *drop* reads "
+          f"'{verdict.split(':')[0]}', not PASS")
 
 
 def test_a_silent_population_is_refused_rather_than_judged():

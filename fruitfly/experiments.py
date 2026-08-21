@@ -721,8 +721,28 @@ def _burst(gf: np.ndarray, events: list[tuple[int, int]]) -> float:
     return float(np.mean(peaks))
 
 
-def _summarise(samples: dict, events: list[tuple[int, int]]
-               ) -> dict[str, float]:
+def _blank_bursts(gf_events: np.ndarray) -> dict[str, float]:
+    """The blank floor's burst, scored under each condition's own shape.
+
+    A maximum over more windows is bigger than one over fewer under the
+    identical null, and the conditions do not agree on shape: scroll
+    offers 40 windows per event, loom 13. One blank number would be a
+    floor too high for loom and too low for scroll — and since the bias
+    is systematic every brain would shift the same way, so agreeing on
+    sign would prove nothing. Gray is stationary, so its event ticks can
+    simply be re-carved into whatever shape is being judged.
+    """
+    out = {}
+    for kind in WORLD_CONDITIONS:
+        n_event, repeats = event_shape(kind)
+        spans = [(r * n_event, (r + 1) * n_event) for r in range(repeats)
+                 if (r + 1) * n_event <= len(gf_events)]
+        out[f"GF_burst@{kind}"] = _burst(gf_events, spans)
+    return out
+
+
+def _summarise(samples: dict, events: list[tuple[int, int]],
+               kind: str) -> dict[str, float]:
     """Per-tick traces -> the scalars conditions are compared on.
 
     Restricted to the event ticks: the gray between repeats must not
@@ -734,6 +754,8 @@ def _summarise(samples: dict, events: list[tuple[int, int]]
             "DNa02": ("DNa02_L", "DNa02_R")}
     out = {"GF": float(samples["GF_spikes"][idx].sum()) / seconds,
            "GF_burst": _burst(samples["GF_spikes"], events)}
+    if kind == "blank":
+        out.update(_blank_bursts(samples["GF_spikes"][idx]))
     for name, (left, right) in both.items():
         out[name] = float(0.5 * (samples[left][idx].mean()
                                  + samples[right][idx].mean()))
@@ -787,12 +809,16 @@ def drive_effect(runs: list[dict]) -> dict:
     out: dict[str, dict] = {}
     for cond in WORLD_CONDITIONS:
         for metric in WORLD_METRICS:
+            # A metric whose value depends on the shape of the event has
+            # a per-condition floor; the rest share one.
+            shaped = f"{metric}@{cond}"
+            key = shaped if shaped in runs[0]["blank_A"] else metric
             real, sham, base_hz = [], [], []
             for run in runs:
-                base = run["blank_A"][metric]
+                base = run["blank_A"][key]
                 base_hz.append(base)
                 real.append(run[cond][metric] - base)
-                sham.append(run["blank_B"][metric] - base)
+                sham.append(run["blank_B"][key] - base)
             real_a = np.array(real, dtype=np.float64)
             sham_a = np.array(sham, dtype=np.float64)
             floor = float(sham_a.std(ddof=1)) if len(sham_a) > 1 else 0.0
@@ -818,8 +844,7 @@ def world_drive(indptr, indices, weights, pops, retina_data, *,
                 seeds=(7, 11, 13), dt=2.0, noise_rate=100.0,
                 noise_weight=3.0, inh_gain=1.5) -> dict:
     """M0.3: play an fff world through the eyes of several brains."""
-    runs = []
-    orders = []
+    runs, orders, traces = [], [], []
     for i, seed in enumerate(seeds):
         brain = Brain(indptr, indices, weights, pops, dt=dt,
                       noise_rate=noise_rate, noise_weight=noise_weight,
@@ -834,6 +859,7 @@ def world_drive(indptr, indices, weights, pops, retina_data, *,
         order = condition_order(i)
         orders.append(order)
         run: dict[str, dict] = {}
+        trace: dict[str, dict] = {}
         for label, kind, seconds in _world_schedule(order):
             if seconds > 0.0:
                 n = int(round(seconds / TICK))
@@ -844,10 +870,17 @@ def world_drive(indptr, indices, weights, pops, retina_data, *,
                                        patches, gf_mask)
             if label in ("rest", "settle"):
                 continue
-            run[label] = _summarise(samples, events)
+            run[label] = _summarise(samples, events, kind)
+            # Kept, because every statistic in this file has been wrong
+            # once and rerunning six brains to try another one costs a
+            # quarter of an hour. M0.2 learned the same lesson and named
+            # it capture-once-replay-many.
+            trace[label] = {"events": events, **samples}
         runs.append(run)
+        traces.append(trace)
     return {"seeds": list(seeds), "dt": dt, "runs": runs,
-            "orders": orders, "effects": drive_effect(runs)}
+            "orders": orders, "traces": traces,
+            "effects": drive_effect(runs)}
 
 
 def format_world(result: dict) -> str:
@@ -904,22 +937,28 @@ def _world_verdict(effects: dict) -> str:
     null — it would mean fff rides the disclosed injection rather than
     that no coupling exists.
     """
-    def drove(cond):
-        return [m for m in WORLD_METRICS if effects[f"{cond}/{m}"]["drives"]]
+    def drove(cond, positive=False):
+        return [m for m in WORLD_METRICS
+                if effects[f"{cond}/{m}"]["drives"]
+                and (not positive or effects[f"{cond}/{m}"]["effect"] > 0)]
 
     loom, scroll = drove("loom"), drove("scroll")
-    escaped = [c for c in (loom, scroll)
-               if any(m in c for m in ESCAPE_METRICS)]
-    if len(escaped) == 1 and escaped[0] is loom:
+    # Escape is *more* giant fiber, never less. Without the sign guard a
+    # condition that suppressed bursts would print a pass.
+    def escapes(cond):
+        return bool(set(drove(cond, positive=True)) & set(ESCAPE_METRICS))
+
+    loom_escapes, scroll_escapes = escapes("loom"), escapes("scroll")
+    if loom_escapes and not scroll_escapes:
         return ("PASS: an approaching pipe reaches the giant fiber "
                 "through the eyes alone, and a flat one does not — fff "
                 "should render pipes with perspective, and the flap can "
                 "be a real escape")
-    if len(escaped) == 2:
+    if loom_escapes and scroll_escapes:
         return ("PASS: pipes reach the giant fiber either way — motion "
                 "is enough and expansion is not required; fff can render "
                 "flat")
-    if escaped:
+    if scroll_escapes:
         return ("ODD: a flat sweep commands escape and an approach does "
                 "not, which is backwards for a loom detector — treat as "
                 "a measurement fault, not a finding")
