@@ -37,6 +37,21 @@ export class Rng {
     return (this.next() * n) | 0;
   }
 
+  /** Uniform in [lo, hi), matching Python's `random.uniform`. */
+  uniform(lo: number, hi: number): number {
+    return lo + (hi - lo) * this.next();
+  }
+
+  /** One of the given values, matching Python's `random.choice`. */
+  pick<T>(items: readonly T[]): T {
+    return items[this.below(items.length)]!;
+  }
+
+  /** Either -1 or +1, which is what `choice((-1, 1))` is always used for. */
+  sign(): number {
+    return this.next() < 0.5 ? -1 : 1;
+  }
+
   /**
    * Standard normal, Box-Muller.
    *
