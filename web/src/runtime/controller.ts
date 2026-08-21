@@ -22,10 +22,12 @@
  */
 
 import { MotorMap, ESCAPE, FLYING, SQUASHED, TAKEOFF, LANDED } from "../motor/motor.js";
+import { PressDetector } from "../motor/pads.js";
 import { EYE_RADIUS, PATCH } from "../senses/retina.js";
 import { Senses } from "../senses/senses.js";
 import { drawFly, drawSplat } from "../ui/sprite.js";
 import { SimClock } from "./simclock.js";
+import type { Game } from "../games/api.js";
 import type { FromWorker, SenseMessage, ToWorker } from "./protocol.js";
 
 /**
@@ -77,6 +79,10 @@ export class Controller {
 
   /** Called whenever the fly's own narration changes. */
   onEvent: ((text: string) => void) | null = null;
+
+  /** Optional cabinet. Without one this is just a fly on a canvas. */
+  game: Game | null = null;
+  private readonly presses = new PressDetector();
 
   constructor(
     private readonly view: HTMLCanvasElement,
@@ -215,9 +221,24 @@ export class Controller {
       }
     }
 
+    // The game runs on the fly's clock, and it is told what the fly did
+    // rather than being allowed to ask for anything. Press detection is
+    // the runtime's, not the game's: it is the one piece of logic M0.2
+    // decided and no cabinet may reinterpret it.
+    if (this.game && dt > 0) {
+      const pressed = this.presses.poll(
+        this.game.pads(),
+        this.motor.st,
+        CANVAS_W,
+        CANVAS_H,
+      );
+      this.game.tick({ dt, t, fly: this.motor.st, pressed });
+    }
+
     // The world is redrawn every frame so the retina always samples the
     // current scene, even on a frame the fly did not move.
-    this.drawWorld(this.worldCtx, t);
+    if (this.game) this.game.drawWorld(this.worldCtx, CANVAS_W, CANVAS_H);
+    else this.drawWorld(this.worldCtx, t);
 
     if (this.clock.running && t >= this.nextSenseAt) {
       this.nextSenseAt = t + 1 / SENSE_HZ;
@@ -240,6 +261,15 @@ export class Controller {
         wingPhase: st.wingPhase,
       });
     }
+    // Scoreboards and captions go on last and only here: the fly should
+    // not be reading its own score out of its own retina.
+    this.game?.drawOverlay?.(this.viewCtx, CANVAS_W, CANVAS_H);
+  }
+
+  /** Swap cabinets without restarting the brain. */
+  setGame(game: Game | null): void {
+    this.game = game;
+    this.presses.reset();
   }
 
   hud(): Hud {

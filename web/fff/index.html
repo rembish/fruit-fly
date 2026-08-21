@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fruit Flappy Fly</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --ink: #e8ecf1;
+        --dim: #8b95a3;
+        --line: #2a2f38;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 22px 16px 48px;
+        background: #0d0f13;
+        color: var(--ink);
+        font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+      }
+      h1 { font-size: 15px; font-weight: 600; margin: 0; }
+      h1 span { color: var(--dim); font-weight: 400; }
+      #stage { position: relative; width: min(960px, 100%); }
+      canvas {
+        display: block;
+        width: 100%;
+        height: auto;
+        aspect-ratio: 960 / 540;
+        background: #11141a;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        cursor: crosshair;
+        touch-action: none;
+      }
+      #loading {
+        position: absolute; inset: 0;
+        display: grid; place-content: center; gap: 10px; justify-items: center;
+        background: rgba(13, 15, 19, 0.92); border-radius: 6px;
+      }
+      #bar { width: 240px; height: 3px; background: var(--line); border-radius: 2px; }
+      #bar div { height: 100%; width: 0; background: #5b8dd9; border-radius: 2px; }
+      #hud, #event, #explain, .note {
+        width: min(960px, 100%);
+        white-space: pre-wrap;
+        color: var(--dim);
+        margin: 0;
+      }
+      #event { color: #7fc98a; min-height: 1.55em; }
+      #explain { color: var(--ink); }
+      #controls { display: flex; flex-wrap: wrap; gap: 14px; width: min(960px, 100%); }
+      .group { display: flex; align-items: center; gap: 5px; }
+      .group .label { color: var(--dim); margin-right: 2px; }
+      button {
+        font: inherit; color: var(--dim);
+        background: #14181f; border: 1px solid var(--line);
+        border-radius: 4px; padding: 3px 9px; cursor: pointer;
+      }
+      button:hover { color: var(--ink); }
+      button.on { background: #24405f; color: #dcebff; border-color: #3a6390; }
+      code { color: var(--ink); }
+    </style>
+  </head>
+  <body>
+    <h1>Fruit Flappy Fly <span>— two modes, one connectome</span></h1>
+
+    <div id="stage">
+      <canvas id="view" width="960" height="540"></canvas>
+      <div id="loading">
+        <div>waking the fly</div>
+        <div id="bar"><div></div></div>
+        <div id="note" style="color: var(--dim)"></div>
+      </div>
+    </div>
+
+    <div id="controls"></div>
+    <p id="explain"></p>
+
+    <div id="event"></div>
+    <div id="hud"></div>
+
+    <p class="note">
+      Move the pointer over the canvas to sabotage the fly — it sees you,
+      with the angular size a flat screen cannot supply. Click on it to
+      swat. <code>flapper</code> swaps the fly for a Poisson process
+      rate-matched to its own press rate, or for nothing at all: that
+      comparison, not the score, is the actual result.
+    </p>
+    <p class="note">
+      <code>pipes in the fly's eyes</code> is a control, not a graphics
+      setting. The game is drawn into the canvas the retina samples, so a
+      moving scene modulates the fly's arousal — measured at 3.2–12.2 Hz
+      of descending drive against 5.75 blind — and that moves its landing
+      behaviour and therefore its press rate. Turning it off gives the
+      same fly a scene it cannot see.
+    </p>
+
+    <script type="module" src="/src/pages/fff.ts"></script>
+  </body>
+</html>

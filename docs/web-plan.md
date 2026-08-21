@@ -618,6 +618,52 @@ Still Phase 3's: the Game API, pads on screen, fff itself. The pad
 press per arrival — because M0.2 decided it and the plan puts those
 tests in this phase.
 
+### Phase 3, 2026-08-21: fff, in both modes, before choosing either
+
+Code: `web/src/games/api.ts`, `web/src/games/fff/`, `web/fff/index.html`.
+Live at `/fff/`, with the mode switchable while it runs.
+
+The design doc's game is the **controller** mode and it is worth
+restating plainly, because this plan drifted from it: *the fly is an
+input device*. A bird falls under gravity and flaps when, and only when,
+the fly lands on the FLAP pad. The fly is not playing anything and does
+not know a game exists. That is the joke, and the doc's headline was
+never "a fly plays Flappy Bird" — it was "a fruit fly's connectome
+scores no better than chance at Flappy Bird, and here is the
+measurement", which is why the flapper is swappable between the fly, a
+Poisson process rate-matched to the fly's own press rate, and nobody.
+
+The **pilot** mode is the other reading, and it is a different claim:
+the fly *is* the bird, no pad and no proxy, its own body has to be in
+the gap. Nothing aims it — M0.1 established it does not steer toward
+anything — so it is not a game it can win. It is a way of watching what
+a connectome does when a wall arrives, which M0.3 measured at the
+population level and this shows at the whole-animal one. Both are built;
+neither is chosen here.
+
+**What the first runs show.** Controller mode: the bird sits on the
+floor. At M0.2's measured ~4 pad arrivals a minute the fly supplies one
+flap every fifteen seconds, against a bird that needs one every 0.68 s
+to hold its height — a factor of twenty-two. It is not close, and it is
+not a tuning failure to be fixed by softening gravity: softening it
+until the fly looks competent would be inventing the result the doc
+exists to refuse. Pilot mode survives longer (about 2 s against 0.8 s)
+purely because a fly that wanders is harder to hit than a bird that
+falls.
+
+**The confound is now a switch.** The game is drawn into the canvas the
+retina samples, as the doc requires, so the pipes really do loom in the
+fly's optic lobe — and Phase 2 measured that a moving scene swings the
+descending pool 3.2–12.2 Hz, which moves the fly's landing behaviour and
+therefore its press rate. The Poisson arm has no such coupling. `pipes
+in the fly's eyes: off` gives the same fly the same pad and a scene it
+cannot see, which is the control that comparison needs.
+
+Still open, and deliberately not decided: which mode is the cabinet, and
+whether the three arms run headless in CI with their numbers printed on
+the page (the doc asks for that; it needs padstats re-measured against
+this scene first, per Phase 2's finding).
+
 ## Build order
 
 Phase 0 (measurements) → 1 (brain + parity) → 2 (senses/motor/runtime)

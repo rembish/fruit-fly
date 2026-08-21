@@ -24,7 +24,10 @@ export default defineConfig({
     outDir: resolve(import.meta.dirname, "dist"),
     emptyOutDir: true,
     rollupOptions: {
-      input: { index: resolve(import.meta.dirname, "index.html") },
+      input: {
+        index: resolve(import.meta.dirname, "index.html"),
+        fff: resolve(import.meta.dirname, "fff/index.html"),
+      },
     },
   },
   worker: { format: "es" },
