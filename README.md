@@ -61,9 +61,8 @@ downloaded on first run, ~50 MB).
 ## Install & run
 
 The brain, senses, motor and the cairo-drawn sprite are shared; only the
-window layer is per-platform, in `fruitfly/ui/` (see
-[`ui/base.py`](https://github.com/rembish/fruit-fly/blob/master/fruitfly/ui/base.py) for the interface a backend
-implements).
+window layer is per-platform, in `fruitfly/ui/` (see [`ui/base.py`](https://github.com/rembish/fruit-fly/blob/master/fruitfly/ui/base.py)
+for the interface a backend implements).
 
 | platform | backend | needs |
 |---|---|---|
@@ -71,72 +70,39 @@ implements).
 | macOS 10.15+ | `cocoa` | PyObjC, Screen Recording permission for vision |
 | Windows 10/11 | `win32` | nothing extra (pure `ctypes`) |
 
-All three have been run on real hardware. Linux is the one developed
-against day to day; on macOS and Windows the fly is confirmed to appear,
-fly, draw and quit, but the permission-gated vision path and the
-click-through swatting have had little use, so reports are welcome.
-
-Note that WSL is *not* a supported way to run this. WSLg gives X no
-desktop to grab, so the fly is blind there, and its window fights the
-Windows foreground; the app says so at startup and points at the native
-Windows build.
+All three run on real hardware. Linux is the one developed against day to
+day; on macOS and Windows the fly appears, flies, draws and quits, but the
+permission-gated vision path and the click-through swatting have had little
+use, so reports are welcome. WSL is *not* supported: WSLg gives X no desktop
+to grab, so the fly is blind there and its window fights the Windows
+foreground. The app says so at startup and points at the native build.
 
 **Linux** (Debian/Ubuntu/Mint):
 
 ```bash
 sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0 python3-numpy
-# first run downloads and compiles the brain (~50 MB, one time)
+# the first run downloads and compiles the brain (~50 MB, one time)
 python3 -m fruitfly
 ```
 
-**macOS** (Homebrew). Do not use the `python3` that ships with Xcode: it
-is 3.9, which this project does not support, and pyobjc-core has no 3.9
-wheel — pip falls back to a source build that fails on current clang.
+Transparency needs a compositing window manager (MATE: System → Preferences
+→ Windows → enable compositing); macOS and Windows always composite.
+
+**macOS** (Homebrew). Not the `python3` from Xcode: that is 3.9, which this
+project does not support, and pyobjc-core has no 3.9 wheel, so pip falls
+back to a source build that fails on current clang.
 
 ```bash
 brew install python@3.13 cairo pkgconf
-python3.13 -m venv .venv
-source .venv/bin/activate
+python3.13 -m venv .venv && source .venv/bin/activate
 pip install pyobjc-framework-Cocoa pyobjc-framework-Quartz pycairo numpy
 python -m fruitfly
 ```
 
-`pkgconf` is not optional: pycairo publishes no macOS wheels at all, so it
-always builds from source, and its build finds cairo through pkg-config.
-Installing cairo without it fails with "Dependency lookup for cairo with
-method 'pkg-config' failed".
-
-Stop the fly with `Ctrl-C` in the terminal that started it. If it ever
-refuses to die, `pkill -f "fruitfly"` always works: the fly has no menu
-bar and no `Cmd-Q`, because its windows are deliberately non-activating.
-
-On first launch macOS will ask for **Screen Recording** permission —
-that is the fly's eyesight (it reads the pixels around itself). Decline
-and it still flies, just blind; grant it in System Settings → Privacy &
-Security → Screen Recording and restart. No Accessibility permission is
-needed: swat detection uses the window's own hit-testing.
-
-**As a package**, once its dependencies are satisfied:
-
-```bash
-pip install fruitfly
-fruitfly run
-```
-
-That works from a standing start on **Windows only**, where everything
-needed ships a wheel. Everywhere else pip must build `pycairo` from
-source — it publishes wheels for Windows and nowhere else, and PyGObject
-publishes none at all — so the system libraries have to be there first:
-
-| | pycairo wheel | what pip needs first |
-|---|---|---|
-| Windows | yes | nothing |
-| macOS | no | `brew install cairo pkgconf` |
-| Linux | no | distro `python3-gi python3-gi-cairo`, and a venv created with `--system-site-packages` |
-
-On Linux the distro route above is not just the easier path, it is the
-path: installing into a clean venv fails while building pycairo, with
-"Dependency lookup for cairo with method 'pkg-config' failed".
+First launch asks for **Screen Recording** permission — that is the fly's
+eyesight, reading the pixels around itself. Decline and it still flies, just
+blind. No Accessibility permission is needed: swat detection uses the
+window's own hit-testing.
 
 **Windows** (PowerShell, Python from python.org):
 
@@ -145,20 +111,26 @@ pip install numpy pycairo
 python -m fruitfly
 ```
 
-No extra dependency and no permission prompt: the window layer is pure
-`ctypes` against Win32. The fly is a layered window, so clicks land only
-on the fly itself and pass through everywhere else automatically —
-Windows hit-tests layered windows per-pixel by alpha. On Windows 10
-2004+ the fly is also excluded from screen capture, so it can't see
-itself in its own retina.
+Nothing extra and no permission prompt. The fly is a layered window, so
+Windows hit-tests it per-pixel by alpha: clicks land on the fly and pass
+through everywhere else. On Windows 10 2004+ it is also excluded from screen
+capture so it cannot see itself, which means screen recorders cannot see it
+either — pass `--recordable` to film it.
 
-Or install the package on any platform:
+**As a package**, once the system libraries above are in place:
 
 ```bash
-python3 -m venv --system-site-packages .venv && . .venv/bin/activate
-pip install -e .               # pinned versions in requirements.txt
-fruitfly
+pip install fruitfly && fruitfly run
 ```
+
+That works from a standing start on **Windows only**, where everything ships
+a wheel. Everywhere else pip must build `pycairo` from source — it publishes
+wheels for Windows and nowhere else, and PyGObject publishes none at all —
+so a clean venv fails with "Dependency lookup for cairo with method
+'pkg-config' failed" until cairo and pkg-config are installed. On Linux,
+create the venv with `--system-site-packages` so it can see the distro's
+PyGObject rather than trying to build one.
+
 
 Options:
 
@@ -169,7 +141,11 @@ fruitfly --pure-retina  no looming injection: escapes only via the real eyes
 fruitfly --no-vision    don't sample the screen into the retina
 fruitfly --noise 140    more spontaneous brain activity (a more annoying fly)
 fruitfly --dt 1.0       finer integration (slower; default 2.0 ms)
+fruitfly --dt auto      benchmark this machine, then pick a timestep
+fruitfly --recordable   let screen recorders see the fly (Windows hides it)
 fruitfly --backend gtk  force a backend (gtk, cocoa, win32); default: auto
+fruitfly benchmark      what timestep this machine can sustain
+fruitfly calibrate      re-derive the motor thresholds for a changed brain
 fruitfly test           headless 30 s behavioral test, no window
 ```
 
@@ -195,9 +171,9 @@ mortal**:
 
 The HUD keeps score.
 
-Quit with Ctrl-C in the terminal. On Linux this needs a compositing
-window manager for transparency (MATE: System → Preferences → Windows →
-enable compositing); macOS and Windows always composite.
+Stop the fly with `Ctrl-C` in the terminal that started it. If it ever
+refuses to die, `pkill -f fruitfly` always works: it has no menu bar and no
+`Cmd-Q`, because its windows are deliberately non-activating.
 
 ## Things to try
 
@@ -215,106 +191,81 @@ enable compositing); macOS and Windows always composite.
 What is real: the complete wiring diagram (every neuron, every connection
 ≥5 synapses, signed by predicted neurotransmitter), the LIF dynamics and
 parameters of Shiu et al., the retinotopic eye maps, and the identity of
-every input/output circuit used (photoreceptors, lamina, LC4/LPLC2 looming
-detectors, giant fiber, DNa02 steering neurons, DNp09, MDN, the descending
-pool).
+every circuit used — photoreceptors, lamina, LC4/LPLC2 looming detectors,
+giant fiber, DNa02 steering neurons, DNp09, MDN, the descending pool.
 
-What is corrected — not an approximation, a repair of a known defect in
-the source data:
+**Corrected, not approximated.** Photoreceptors release histamine, which is
+inhibitory, and that inhibition *is* the ON/OFF split. FlyWire's
+neurotransmitter classifier has no histamine class and mislabels ~74% of
+photoreceptor outputs as excitatory, so their outgoing sign is forced
+negative at compile time. Without it the ON/OFF pathways are scrambled, so
+this moves toward the real fly rather than away from it.
 
-- **Histamine sign**: photoreceptors release histamine, which is
-  inhibitory, and that inhibition *is* the ON/OFF pathway split. The
-  FlyWire neurotransmitter classifier has no histamine class at all and
-  so mislabels ~74% of photoreceptor outputs as excitatory. Their
-  outgoing sign is forced negative during compilation. Without this the
-  ON/OFF pathways are scrambled, so this moves the model toward the real
-  fly rather than away from it. The principled generalisation, not done
-  here, would be to take the neurotransmitter from curated per-cell-type
-  literature wherever it is known and fall back to the classifier only
-  otherwise.
+Approximated, and why:
 
-What is added or approximated, and why:
+- **Monoamines as fast excitation.** Dopamine, serotonin and octopamine are
+  modelled as ordinary excitatory synapses. They are not: they act through
+  GPCRs with slow, multiplicative effects, and serotonin's is broadly
+  opposite to octopamine's. This is 1.97% of the connectome by synapse
+  weight, octopamine alone 0.28%. Inherited rather than invented — Shiu et
+  al. make the same simplification — but it belongs on this list.
 
-- **Graded-neuron transduction**: photoreceptors and lamina monopolar
-  cells are non-spiking, graded neurons in the real fly, which a spiking
-  LIF model represents poorly (inhibition released onto a silent neuron
-  produces nothing). Their textbook transfer functions — adaptive
-  phototransduction, and the lamina's transient OFF response to local
-  darkening — are computed in the sensory layer and injected at L1/L2/L3
-  per column. The real network begins at the lamina's *output* synapses,
-  not at the medulla.
+- **Graded-neuron transduction.** Photoreceptors and lamina monopolar cells
+  are non-spiking graded neurons, which a spiking LIF represents poorly.
+  Their textbook transfer functions — adaptive phototransduction, and the
+  lamina's transient OFF response — are computed in the sensory layer and
+  injected at L1/L2/L3 per column. The real network begins at the lamina's
+  *output* synapses, not at the medulla.
 
-  What that boundary still buys is more than it sounds. The ON/OFF split
-  is not injected, it is wired: in the compiled connectome L1's output is
-  99.6% inhibitory (glutamate and GABA) while L2's is 99.6% and L3's
-  99.8% cholinergic. So the sign inversion that builds the ON pathway is
-  the real circuit's, and it operates on whatever the injection feeds it.
+  That boundary still buys the ON/OFF split, which is wired rather than
+  injected: L1's output is 99.6% inhibitory (glutamate and GABA) while L2's
+  is 99.6% and L3's 99.8% cholinergic, so the sign inversion that builds the
+  ON pathway is the real circuit's.
 
-  Letting the OFF response emerge instead — biasing the lamina cells to a
-  depolarized point and letting real histamine inhibition be released by
-  darkness — was measured and rejected. Photoreceptor input per lamina
-  cell spans 5 to 111 synapses, so no single bias fits: the weakly-driven
-  cells fire constantly and the strongly-driven ones never fire. A
-  per-neuron bias derived from each cell's own afferents fixes that and
-  still fails, because Poisson shot noise on those inputs is about 6 mV
-  against a 7 mV threshold gap — the cell cannot tell darkness from a gap
-  in its own input. And 30% of the L1-L3 cells have no photoreceptor
-  afferent at all in the compiled graph, so those columns would go blind.
-  The honest summary is that a spiking model cannot represent a graded
-  synapse by discretising it; the fix is graded transmission, not a
-  cleverer bias.
-- **Background noise** (Poisson, central brain only): the connectome alone
-  is silent — a network with no input never fires. Real brains have
-  intrinsic noise and neuromodulation; ours is the source of all
-  spontaneous behavior, but every "decision" still propagates through the
-  real synapses.
-- **Monoamines as fast excitation**: dopamine, serotonin and octopamine
-  are modelled as ordinary excitatory synapses, like every other
-  excitatory connection. They are not: they act through GPCRs with slow,
-  multiplicative effects on gain and state, and serotonin's effect is
-  broadly opposite to octopamine's. This is 1.97% of the connectome by
-  synapse weight (octopamine alone 0.28%), and it is inherited rather
-  than invented — Shiu et al. make the same simplification — but it was
-  missing from this list, which is why it is here now.
-- **Spike-frequency adaptation + slow noise-floor governor**: without them
-  the model has only two states, coma and seizure (the paper only ever
-  stimulates it for fractions of a second from silence). Adaptation is
-  biologically standard and gives the network self-quenching bursts. The
-  governor is not: it is a controller that raises the invented noise
-  floor when the network falls quiet and backs it off when the network
-  rages. It is tempting to call that arousal, and this project used to,
-  but real arousal is neuromodulatory and could not do this job —
-  octopamine multiplies drive that already exists, and multiplying a
-  silent network leaves it silent. The governor sets a floor; a
-  neuromodulator sets a gain. Only the floor keeps coma from being an
+  Letting the OFF response emerge instead — biasing the lamina so real
+  histamine inhibition is released by darkness — was measured and rejected.
+  Photoreceptor input per lamina cell spans 6 to 128 synapses (5th to 95th
+  percentile), so no single bias fits. Deriving it per neuron fixes that and
+  still fails: Poisson shot noise on those inputs is ~6.7 mV against a 7 mV
+  threshold gap, so a cell cannot tell darkness from a gap in its own input.
+  And 28% of L1–L3 cells have no photoreceptor afferent at all. A spiking
+  model cannot represent a graded synapse by discretising it; the fix would
+  be graded transmission, not a cleverer bias.
+
+- **Spike-frequency adaptation and a noise-floor governor.** Without them the
+  model has only two states, coma and seizure. Adaptation is biologically
+  standard; the governor is not — it raises an invented noise floor when the
+  network falls quiet. Tempting to call that arousal, and this project used
+  to, but octopamine multiplies drive that already exists, and multiplying a
+  silent network leaves it silent. The governor sets a floor, a
+  neuromodulator sets a gain, and only the floor keeps coma from being an
   absorbing state.
-- **Exponential synapses, dt = 2 ms** instead of alpha synapses at 0.1 ms:
-  calibrated to the same single-synapse PSP peak (0.275 mV). The decay
-  factors are exact, `exp(-dt/tau)`, so dt costs spike-timing resolution
-  but does not rescale the time constants. `python3 -m fruitfly benchmark`
-  measures what your machine sustains. Note that dt is not purely a speed
-  knob: finer steps resolve coincidences the coarse step merged, the
-  network fires more, and the motor map was calibrated against the coarse
-  rate — at dt=0.5 the fly stops landing altogether (landed 15.4s of 30s
-  at dt=2.0, 0.6s at dt=0.5). Going finer needs a motor retune, which is
-  why `--dt auto` will not choose it for you.
-- **A higher giant-fiber threshold and rate-based motor readout**: the real
-  GF is a huge neuron famous for its high threshold; and real motor
-  circuits threshold their drive — but the wing motor neurons live in the
-  ventral nerve cord, and this connectome stops at the neck. The final
-  translation of descending-neuron rates into 2D screen motion is ours,
-  and is the least principled part of the project. It is also the part
-  that makes it a desktop toy instead of a paper.
 
-  This one is deliberate, not pending. The nerve cord *is* public — the
-  MANC connectome is 23,188 traced neurons including 379 wing and leg
-  motor neurons, downloadable as 76 MB of CSV, and the descending neurons
-  this project reads (DNa01, DNa02, DNp01, DNp09) match it by name, so
-  the bridge would work. But MANC is a male nerve cord and FlyWire is a
-  female brain. Wiring one to the other would buy a real motor readout at
-  the cost of the sentence this whole project rests on: that you are
-  watching one animal's brain. A chimera of two flies is not the complete
-  real brain of a fruit fly. The invented motor map stays.
+- **Exponential synapses at dt = 2 ms** instead of alpha synapses at 0.1 ms,
+  calibrated to the same single-synapse PSP peak (0.275 mV). Decay factors
+  are exact, `exp(-dt/tau)`, so dt costs spike-timing resolution without
+  rescaling the time constants; `fruitfly benchmark` measures what your
+  machine sustains. But dt is not purely a speed knob: finer steps resolve
+  coincidences the coarse step merged, the network fires more, and the motor
+  map was calibrated against the coarse rate — at dt=0.5 the fly stops
+  landing (15.4 s of 30 landed at dt=2.0, 0.6 s at dt=0.5). Going finer
+  needs `fruitfly calibrate`, which is why `--dt auto` will not do it for
+  you.
+
+- **A higher giant-fiber threshold and a rate-based motor readout.** The real
+  GF is famous for its high threshold, and real motor circuits threshold
+  their drive — but the wing motor neurons live in the ventral nerve cord,
+  and this connectome stops at the neck. Turning descending rates into 2D
+  screen motion is ours, and the least principled part of the project. It is
+  also what makes it a desktop toy instead of a paper.
+
+  That one is deliberate, not pending. The nerve cord is public: MANC is
+  23,188 traced neurons including 379 wing and leg motor neurons, 76 MB of
+  CSV, and the descending neurons read here (DNa01, DNa02, DNp01, DNp09)
+  match it by name. But MANC is a male nerve cord and FlyWire a female
+  brain. A chimera of two flies is not the complete real brain of a fruit
+  fly, so the invented motor map stays.
+
 
 ## Tests
 
@@ -351,24 +302,32 @@ decide how the fly behaves are where the coverage is — `senses` 100%,
 ## Layout
 
 ```
-fruitfly/data.py     download + compile connectome & retinotopy (brain.npz)
-fruitfly/brain.py    event-driven whole-brain LIF engine (numpy)
-fruitfly/senses.py   retinotopic eyes: pixels -> photoreceptors & lamina
-fruitfly/motor.py    descending neurons -> flight kinematics
-fruitfly/sprite.py   the fly, in cairo
-fruitfly/core.py     platform-independent controller + brain thread
-fruitfly/ui/base.py  the Host interface a window backend implements
-fruitfly/ui/gtk.py   Linux/X11 backend
-fruitfly/ui/cocoa.py macOS backend
-fruitfly/ui/win32.py Windows backend (ctypes, no dependency)
-fruitfly/app.py      wires brain + senses + backend together
-tests/               circuit, retina, closed-loop and backend-contract tests
+fruitfly/data.py      download + compile connectome & retinotopy (brain.npz)
+fruitfly/brain.py     event-driven whole-brain LIF engine (numpy)
+fruitfly/senses.py    retinotopic eyes: pixels -> photoreceptors & lamina
+fruitfly/motor.py     descending neurons -> flight kinematics
+fruitfly/sprite.py    the fly, and the splat when you get it, drawn in cairo
+fruitfly/core.py      platform-independent controller + brain thread
+fruitfly/ui/base.py   the Host interface a window backend implements
+fruitfly/ui/gtk.py    Linux/X11 backend
+fruitfly/ui/cocoa.py  macOS backend
+fruitfly/ui/win32.py  Windows backend (ctypes, no dependency)
+fruitfly/bench.py     what timestep this machine can actually sustain
+fruitfly/calibrate.py re-derives the motor thresholds when the brain changes
+fruitfly/app.py       wires brain + senses + backend together
+fruitfly/__main__.py  the CLI: run, benchmark, calibrate, fetch, prepare, test
+tests/                backend contract, circuit, retina, closed-loop, tuning
 ```
 
 Porting to another window system means implementing one class: five
 methods (screen size, pointer, screen grab, move window, redraw) plus
 event-loop wiring. `tests/test_backends.py` checks any backend against
 the contract with a headless fake host.
+
+Same idea, arrived at independently and in Swift:
+[DenisSergeevitch/desktop-fly](https://github.com/DenisSergeevitch/desktop-fly)
+— a 3D fly on the macOS desktop, also driven by a live spiking simulation of
+the FlyWire connectome.
 
 Data credit: [FlyWire](https://flywire.ai/) (Dorkenwald et al., Schlegel et
 al., *Nature* 2024), used under its public data terms. Model design after
