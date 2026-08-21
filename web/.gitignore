@@ -6,3 +6,9 @@ dist/
 # is itself downloaded rather than committed. The site serves it; git
 # does not carry it.
 public/brain/
+
+# ... except the benchmark's result, which is not a build artefact. It is
+# a measurement, the README and both pages quote it, and a kilobyte of
+# it means a fresh clone shows the numbers rather than an em dash until
+# someone spends seven minutes reproducing them.
+!public/brain/bench.json

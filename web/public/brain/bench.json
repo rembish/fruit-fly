@@ -1,0 +1,56 @@
+{
+  "generatedBy": "web/harness/fff-bench.ts",
+  "seed": 7,
+  "captureSeconds": 320,
+  "roundsPerArm": 60,
+  "pressRatePerMinute": 117.375,
+  "startles": 53,
+  "escapesOntoPlate": 30,
+  "meanDescendingHz": 5.745975588024785,
+  "meanLc4Hz": 0.5303383544373796,
+  "arms": {
+    "fly": {
+      "medianScore": 0,
+      "scoreCI": [
+        0,
+        0
+      ],
+      "medianAlive": 4.849999999999988,
+      "best": 1,
+      "rounds": 60
+    },
+    "poisson": {
+      "medianScore": 0,
+      "scoreCI": [
+        0,
+        0
+      ],
+      "medianAlive": 4.849999999999988,
+      "best": 1,
+      "rounds": 60
+    },
+    "nobody": {
+      "medianScore": 0,
+      "scoreCI": [
+        0,
+        0
+      ],
+      "medianAlive": 4.849999999999988,
+      "best": 0,
+      "rounds": 60
+    },
+    "oracle": {
+      "medianScore": 3,
+      "scoreCI": [
+        2,
+        6
+      ],
+      "medianAlive": 9.116666666666719,
+      "best": 35,
+      "rounds": 60
+    }
+  },
+  "flyBeatsPoisson": 0.4666666666666667,
+  "flyBeatsNobody": 0.5083333333333333,
+  "gameIsWinnable": true
+}
